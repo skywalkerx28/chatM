@@ -1,6 +1,6 @@
 //
 // BluetoothMeshService.swift
-// bitchat
+// Mchat 
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -132,8 +132,9 @@ enum PeerConnectionState: CustomStringConvertible {
 class BluetoothMeshService: NSObject {
     // MARK: - Constants
     
-    static let serviceUUID = CBUUID(string: "F47B5E2D-4A9E-4C5A-9B3F-8E1D2C3A4B5C")
-    static let characteristicUUID = CBUUID(string: "A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D")
+    // mchat-specific BLE identifiers (unique UUIDs for mchat app)
+    static let serviceUUID = CBUUID(string: "61B0F83C-30BE-4900-86EB-086018D88776")
+    static let characteristicUUID = CBUUID(string: "5A699A5B-0C74-48E2-A134-2648DE96C571")
     
     // MARK: - Core Bluetooth Properties
     
@@ -280,7 +281,7 @@ class BluetoothMeshService: NSObject {
     
     // MARK: - Thread-Safe Collections
     
-    private let collectionsQueue = DispatchQueue(label: "chatM.collections", attributes: .concurrent)
+    private let collectionsQueue = DispatchQueue(label: "mchat.collections", attributes: .concurrent)
     private let collectionsQueueKey = DispatchSpecificKey<Void>()
     private var lastLoggedConnectionLimit: Int = 0
     
@@ -491,7 +492,7 @@ class BluetoothMeshService: NSObject {
     }
     // MARK: - Message Processing
     
-    private let messageQueue = DispatchQueue(label: "chatM.messageQueue", attributes: .concurrent) // Concurrent queue with barriers
+    private let messageQueue = DispatchQueue(label: "mchat.messageQueue", attributes: .concurrent) // Concurrent queue with barriers
     
     // Message state tracking for better duplicate detection
     private struct MessageState {
@@ -561,8 +562,9 @@ class BluetoothMeshService: NSObject {
     #endif
     
     // Core Bluetooth state restoration identifiers
-    private static let centralManagerRestorationID = "com.chatm.central"
-    private static let peripheralManagerRestorationID = "com.chatm.peripheral"
+    // Must be unique per app so iOS doesn't merge restored BLE state
+    private static let centralManagerRestorationID = "com.mchat.central"
+    private static let peripheralManagerRestorationID = "com.mchat.peripheral"
     
     // Battery optimizer integration
     private let batteryOptimizer = BatteryOptimizer.shared
@@ -596,7 +598,7 @@ class BluetoothMeshService: NSObject {
     
     // Connection state tracking
     private var peerConnectionStates: [String: PeerConnectionState] = [:]
-    private let connectionStateQueue = DispatchQueue(label: "chat.chatm.connectionState", attributes: .concurrent)
+    private let connectionStateQueue = DispatchQueue(label: "mchat.connectionState", attributes: .concurrent)
     
     // MARK: - Protocol ACK Tracking
     
@@ -1376,7 +1378,7 @@ class BluetoothMeshService: NSObject {
         // Update advertisement data with new peer ID
         advertisementData = [
             CBAdvertisementDataServiceUUIDsKey: [BluetoothMeshService.serviceUUID],
-            CBAdvertisementDataLocalNameKey: myPeerID
+            CBAdvertisementDataLocalNameKey: "MC-\(myPeerID)"
         ]
         
         peripheralManager?.startAdvertising(advertisementData)
@@ -1978,8 +1980,8 @@ class BluetoothMeshService: NSObject {
         // Only use allowed advertisement keys
         advertisementData = [
             CBAdvertisementDataServiceUUIDsKey: [BluetoothMeshService.serviceUUID],
-            // Use only peer ID without any identifying prefix
-            CBAdvertisementDataLocalNameKey: myPeerID
+            // Use MC- prefix to distinguish mchat from bitchat on-air
+            CBAdvertisementDataLocalNameKey: "MC-\(myPeerID)"
         ]
         
         isAdvertising = true
@@ -2188,6 +2190,90 @@ class BluetoothMeshService: NSObject {
         }
     }
     
+    /// Sends a message to a specific room/conversation through the mesh network.
+    /// - Parameters:
+    ///   - content: The message content to send
+    ///   - conversationId: The 32-byte conversation ID identifying the room
+    ///   - mentions: Array of user IDs being mentioned in the message
+    ///   - messageID: Optional custom message ID (auto-generated if nil)
+    /// - Note: Messages are gated by CampusGate and only delivered to joined conversations
+    func sendRoomMessage(_ content: String, in conversationId: Data, mentions: [String] = [], messageID: String? = nil) {
+        // Defensive checks
+        guard !content.isEmpty else { return }
+        guard conversationId.count == 32 else { return } // Must be exactly 32 bytes
+        
+        #if os(iOS)
+        let backgroundTask = beginBackgroundTask()
+        #endif
+        
+        messageQueue.async { [weak self] in
+            guard let self = self else {
+                #if os(iOS)
+                self?.endBackgroundTask(backgroundTask)
+                #endif
+                return
+            }
+            
+            let nickname = self.delegate as? ChatViewModel
+            let senderNick = nickname?.nickname ?? self.myPeerID
+            
+            let roomMessage = RoomMessage(
+                conversationId: conversationId,
+                messageId: messageID,
+                sender: senderNick,
+                content: content,
+                mentions: mentions.isEmpty ? nil : mentions
+            )
+            
+            guard let roomMessageData = roomMessage.encode() else {
+                #if os(iOS)
+                self.endBackgroundTask(backgroundTask)
+                #endif
+                return
+            }
+            
+            // Create packet with room message type
+            let packet = BitchatPacket(
+                type: MessageType.roomMessage.rawValue,
+                senderID: Data(hexString: self.myPeerID) ?? Data(),
+                recipientID: SpecialRecipients.broadcast,  // Room messages are broadcast
+                timestamp: UInt64(Date().timeIntervalSince1970 * 1000), // milliseconds
+                payload: roomMessageData,
+                signature: nil,
+                ttl: self.adaptiveTTL
+            )
+            
+            // Track this message to prevent duplicate sends
+            let msgID = "\(packet.timestamp)-\(self.myPeerID)-\(packet.payload.prefix(32).hashValue)"
+            
+            let shouldSend = !self.recentlySentMessages.contains(msgID)
+            if shouldSend {
+                self.recentlySentMessages.insert(msgID)
+            }
+            
+            if shouldSend {
+                // Clean up old entries after 10 seconds
+                self.messageQueue.asyncAfter(deadline: .now() + 10.0) { [weak self] in
+                    guard let self = self else { return }
+                    self.recentlySentMessages.remove(msgID)
+                }
+                
+                // Single send with smart collision avoidance
+                let initialDelay = self.smartCollisionAvoidanceDelay(baseDelay: self.randomDelay())
+                DispatchQueue.main.asyncAfter(deadline: .now() + initialDelay) { [weak self] in
+                    self?.broadcastPacket(packet)
+                    #if os(iOS)
+                    self?.endBackgroundTask(backgroundTask)
+                    #endif
+                }
+            } else {
+                #if os(iOS)
+                self.endBackgroundTask(backgroundTask)
+                #endif
+            }
+        }
+    }
+    
     
     /// Sends an end-to-end encrypted private message to a specific peer.
     /// - Parameters:
@@ -2285,7 +2371,6 @@ class BluetoothMeshService: NSObject {
             }
         }
     }
-    
     private func getEncryptionQueue(for peerID: String) -> DispatchQueue {
         encryptionQueuesLock.lock()
         defer { encryptionQueuesLock.unlock() }
@@ -2294,7 +2379,7 @@ class BluetoothMeshService: NSObject {
             return queue
         }
         
-        let queue = DispatchQueue(label: "chatM.encryption.\(peerID)", qos: .userInitiated)
+        let queue = DispatchQueue(label: "mchat.encryption.\(peerID)", qos: .userInitiated)
         peerEncryptionQueues[peerID] = queue
         return queue
     }
@@ -3110,6 +3195,8 @@ class BluetoothMeshService: NSObject {
                 messageTypeName = "SYSTEM_VALIDATION"
             case .handshakeRequest:
                 messageTypeName = "HANDSHAKE_REQUEST"
+            case .roomMessage:
+                messageTypeName = "ROOM_MESSAGE"
             default:
                 messageTypeName = "UNKNOWN(\(packet.type))"
             }
@@ -3459,6 +3546,99 @@ class BluetoothMeshService: NSObject {
                 SecureLogger.log("Message packet with no recipient ID from \(senderID)", category: SecureLogger.security, level: .warning)
             }
             
+        case .roomMessage:
+            // Handle room/conversation messages
+            let senderID = packet.senderID.hexEncodedString()
+            guard !senderID.isEmpty && senderID != myPeerID else { return }
+            
+            // Room messages are always broadcast
+            guard let recipientID = packet.recipientID,
+                  recipientID == SpecialRecipients.broadcast else { return }
+            
+            // Parse room message from binary payload
+            guard let roomMessage = RoomMessage.decode(from: packet.payload) else {
+                SecureLogger.log("Failed to decode room message from \(senderID)", 
+                               category: SecureLogger.session, level: .warning)
+                return
+            }
+            
+            // Gate by campus presence - require valid campus credential
+            let shouldAcceptMessage: Bool
+            if let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id {
+                shouldAcceptMessage = self.campusGate.shouldAcceptMessage(from: senderID, topicCampusId: campusId)
+            } else {
+                // No profile loaded yet - drop room messages for security
+                shouldAcceptMessage = false
+            }
+            
+            guard shouldAcceptMessage else {
+                SecureLogger.log("Dropped room message from \(senderID) - failed CampusGate check", 
+                               category: SecureLogger.session, level: .info)
+                return
+            }
+            
+            // Check if we're joined to this conversation (except for announcements)
+            let conversationStore = ConversationStore.shared
+            let isAnnouncements = roomMessage.conversationId == TopicManager.announcementsId(
+                campusId: MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+            )
+            
+            if !isAnnouncements && !conversationStore.isJoined(roomMessage.conversationId) {
+                SecureLogger.log("Dropped room message - not joined to conversation", 
+                               category: SecureLogger.session, level: .debug)
+                return
+            }
+            
+            // Store nickname mapping
+            collectionsQueue.sync(flags: .barrier) {
+                if let session = self.peerSessions[senderID] {
+                    session.nickname = roomMessage.sender
+                } else {
+                    let session = PeerSession(peerID: senderID, nickname: roomMessage.sender)
+                    self.peerSessions[senderID] = session
+                }
+            }
+            
+            // Convert RoomMessage to BitchatMessage for UI compatibility
+            let bitchatMessage = BitchatMessage(
+                id: roomMessage.messageId,
+                sender: roomMessage.sender,
+                content: roomMessage.content,
+                timestamp: roomMessage.timestamp,
+                isRelay: false,
+                originalSender: nil,
+                isPrivate: false, // Room messages are not private
+                recipientNickname: nil,
+                senderPeerID: senderID,
+                mentions: roomMessage.mentions
+            )
+            
+            // Track last message time from this peer
+            self.lastMessageFromPeer.set(senderID, value: Date())
+            
+            // Update unread count for the conversation
+            Task { @MainActor in
+                conversationStore.incrementUnreadCount(conversationId: roomMessage.conversationId)
+            }
+            
+            // Deliver to UI via delegate
+            DispatchQueue.main.async {
+                // Create a custom delegate method for room messages that includes conversation ID
+                if let chatViewModel = self.delegate as? ChatViewModel {
+                    chatViewModel.didReceiveRoomMessage(bitchatMessage, in: roomMessage.conversationId)
+                } else {
+                    // Fallback to regular message handling if delegate doesn't support room messages yet
+                    self.delegate?.didReceiveMessage(bitchatMessage)
+                }
+            }
+            
+            // Relay room messages
+            var relayPacket = packet
+            relayPacket.ttl -= 1
+            if relayPacket.ttl > 0 {
+                let delay = self.exponentialRelayDelay()
+                self.scheduleRelay(relayPacket, messageID: messageID, delay: delay)
+            }
         // Note: 0x02 was legacy keyExchange - removed
         case .announce:
             if let rawNickname = String(data: packet.payload, encoding: .utf8) {
@@ -4413,9 +4593,110 @@ class BluetoothMeshService: NSObject {
             // See handleReceivedPacket for MESSAGE type handling
             break
             
+        case .roomMessage:
+            // Handle room messages (implement or call handler)
+            handleRoomMessage(packet: packet, from: peerID)
+            
         default:
             break
         }
+        }
+    }
+    
+    // MARK: - Room Message Handler
+    
+    private func handleRoomMessage(packet: BitchatPacket, from peerID: String) {
+        // Handle room/conversation messages
+        let senderID = packet.senderID.hexEncodedString()
+        guard !senderID.isEmpty && senderID != myPeerID else { return }
+        
+        // Room messages are always broadcast
+        guard let recipientID = packet.recipientID,
+              recipientID == SpecialRecipients.broadcast else { return }
+        
+        // Parse room message from binary payload
+        guard let roomMessage = RoomMessage.decode(from: packet.payload) else {
+            SecureLogger.log("Failed to decode room message from \(senderID)", 
+                           category: SecureLogger.session, level: .warning)
+            return
+        }
+        
+        // Gate by campus presence - require valid campus credential
+        let shouldAcceptMessage: Bool
+        if let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id {
+            shouldAcceptMessage = self.campusGate.shouldAcceptMessage(from: senderID, topicCampusId: campusId)
+        } else {
+            // No profile loaded yet - drop room messages for security
+            shouldAcceptMessage = false
+        }
+        
+        guard shouldAcceptMessage else {
+            SecureLogger.log("Dropped room message from \(senderID) - failed CampusGate check", 
+                           category: SecureLogger.session, level: .info)
+            return
+        }
+        
+        // Check if we're joined to this conversation (except for announcements)
+        let conversationStore = ConversationStore.shared
+        let isAnnouncements = roomMessage.conversationId == TopicManager.announcementsId(
+            campusId: MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+        )
+        
+        if !isAnnouncements && !conversationStore.isJoined(roomMessage.conversationId) {
+            SecureLogger.log("Dropped room message - not joined to conversation", 
+                           category: SecureLogger.session, level: .debug)
+            return
+        }
+        
+        // Store nickname mapping
+        collectionsQueue.sync(flags: .barrier) {
+            if let session = self.peerSessions[senderID] {
+                session.nickname = roomMessage.sender
+            } else {
+                let session = PeerSession(peerID: senderID, nickname: roomMessage.sender)
+                self.peerSessions[senderID] = session
+            }
+        }
+        
+        // Convert RoomMessage to BitchatMessage for UI compatibility
+        let bitchatMessage = BitchatMessage(
+            id: roomMessage.messageId,
+            sender: roomMessage.sender,
+            content: roomMessage.content,
+            timestamp: roomMessage.timestamp,
+            isRelay: false,
+            originalSender: nil,
+            isPrivate: false, // Room messages are not private
+            recipientNickname: nil,
+            senderPeerID: senderID,
+            mentions: roomMessage.mentions
+        )
+        
+        // Track last message time from this peer
+        self.lastMessageFromPeer.set(senderID, value: Date())
+        
+        // Update unread count for the conversation
+        Task { @MainActor in
+            conversationStore.incrementUnreadCount(conversationId: roomMessage.conversationId)
+        }
+        
+        // Deliver to UI via delegate
+        DispatchQueue.main.async {
+            // Create a custom delegate method for room messages that includes conversation ID
+            if let chatViewModel = self.delegate as? ChatViewModel {
+                chatViewModel.didReceiveRoomMessage(bitchatMessage, in: roomMessage.conversationId)
+            } else {
+                // Fallback to regular message handling if delegate doesn't support room messages yet
+                self.delegate?.didReceiveMessage(bitchatMessage)
+            }
+        }
+        
+        // Relay room messages
+        var relayPacket = packet
+        relayPacket.ttl -= 1
+        if relayPacket.ttl > 0 {
+            let delay = self.exponentialRelayDelay()
+            self.scheduleRelay(relayPacket, messageID: generatePacketID(for: packet), delay: delay)
         }
     }
     
@@ -4715,19 +4996,30 @@ extension BluetoothMeshService: CBCentralManagerDelegate {
         let peripheralID = peripheral.identifier.uuidString
         
         // Extract peer ID from name or advertisement data (macOS compatibility)
-        // Peer IDs are 8 bytes = 16 hex characters
+        // mchat peer IDs: "MC-" prefix + 16 hex characters = 19 total
         var discoveredPeerID: String? = nil
         
         // First try peripheral name
-        if let name = peripheral.name, name.count == 16 {
-            discoveredPeerID = name
+        if let name = peripheral.name {
+            if name.hasPrefix("MC-") && name.count == 19 {
+                // Extract peer ID without MC- prefix
+                discoveredPeerID = String(name.dropFirst(3))
+            } else if name.count == 16 {
+                // Fallback for backwards compatibility during transition
+                discoveredPeerID = name
+            }
         }
         
         // macOS fix: Also check advertisement data local name
         if discoveredPeerID == nil,
-           let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String,
-           localName.count == 16 {
-            discoveredPeerID = localName
+           let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
+            if localName.hasPrefix("MC-") && localName.count == 19 {
+                // Extract peer ID without MC- prefix
+                discoveredPeerID = String(localName.dropFirst(3))
+            } else if localName.count == 16 {
+                // Fallback for backwards compatibility during transition
+                discoveredPeerID = localName
+            }
         }
         
         if let peerID = discoveredPeerID {
@@ -5698,7 +5990,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         case .message, .announce, .leave, .readReceipt, .deliveryStatusRequest,
              .fragmentStart, .fragmentContinue, .fragmentEnd,
              .noiseIdentityAnnounce, .noiseEncrypted, .protocolNack, 
-             .favorited, .unfavorited, .none:
+             .favorited, .unfavorited, .roomMessage, .none:
             return false
         }
     }
@@ -6865,7 +7157,6 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             sendViaSelectiveRelay(nackPacket, recipientPeerID: peerID)
         }
     }
-    
     // Generate unique packet ID from immutable packet fields
     private func generatePacketID(for packet: BitchatPacket) -> String {
         // Use only immutable fields for ID generation to ensure consistency

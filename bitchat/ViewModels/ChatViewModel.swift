@@ -118,6 +118,13 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
     @Published var autocompleteRange: NSRange? = nil
     @Published var selectedAutocompleteIndex: Int = 0
     
+    // MARK: - Room/Conversation Properties
+    
+    @Published var joinedConversations: [Data: [BitchatMessage]] = [:] // conversationId -> messages
+    @Published var selectedConversation: Data? = nil
+    @Published var unreadRoomMessages: Set<Data> = [] // conversationIds with unread messages
+    private let maxRoomMessages = 1337 // Maximum messages per room before oldest are removed
+    
     // MARK: - Autocomplete Properties
     
     // Autocomplete optimization
@@ -211,6 +218,11 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
             // Initialize peer manager
             peerManager = PeerManager(meshService: meshService)
             peerManager?.updatePeers()
+            
+            // Auto-join system conversations when profile is available
+            if let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id {
+                ConversationStore.shared.autoJoinSystemConversations(campusId: campusId)
+            }
             
             // Bind peer manager's peer list to our published property
             let cancellable = peerManager?.$peers
@@ -3005,6 +3017,233 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
             impactFeedback.impactOccurred()
         }
         #endif
+    }
+    
+    // MARK: - Room Message Handling
+    
+    /// Handle room/conversation messages with conversation ID routing
+    func didReceiveRoomMessage(_ message: BitchatMessage, in conversationId: Data) {
+        // Check if sender is blocked
+        if let senderPeerID = message.senderPeerID {
+            if isPeerBlocked(senderPeerID) {
+                return
+            }
+        } else if let peerID = getPeerIDForNickname(message.sender) {
+            if isPeerBlocked(peerID) {
+                return
+            }
+        }
+        
+        // Initialize conversation messages array if needed
+        if joinedConversations[conversationId] == nil {
+            joinedConversations[conversationId] = []
+        }
+        
+        // Check if this is our own message being echoed back
+        if message.sender != nickname && message.sender != "system" {
+            // Skip empty or whitespace-only messages
+            if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                addRoomMessage(message, to: conversationId)
+            }
+        } else if message.sender != "system" {
+            // Our own message - check if we already have it
+            let messageExists = joinedConversations[conversationId]?.contains { existingMsg in
+                // Check by ID first
+                if existingMsg.id == message.id {
+                    return true
+                }
+                // Check by content and sender with time window (within 1 second)
+                if existingMsg.content == message.content && 
+                   existingMsg.sender == message.sender {
+                    let timeDiff = abs(existingMsg.timestamp.timeIntervalSince(message.timestamp))
+                    return timeDiff < 1.0
+                }
+                return false
+            } ?? false
+            
+            if !messageExists {
+                // This is a message we sent from another device or it's missing locally
+                if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    addRoomMessage(message, to: conversationId)
+                }
+            }
+        } else {
+            // System message - check for empty content before adding
+            if !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                addRoomMessage(message, to: conversationId)
+            }
+        }
+        
+        // Mark as unread if not currently viewing this conversation
+        if selectedConversation != conversationId {
+            unreadRoomMessages.insert(conversationId)
+        } else {
+            // We're viewing this conversation, clear unread status
+            unreadRoomMessages.remove(conversationId)
+            // Mark as read in the conversation store
+            Task { @MainActor in
+                ConversationStore.shared.markAsRead(conversationId: conversationId)
+            }
+        }
+        
+        // Check if we're mentioned
+        let isMentioned = message.mentions?.contains(nickname) ?? false
+        
+        // Send notifications for mentions when app is in background
+        if isMentioned && message.sender != nickname {
+            // Get conversation display name for better notification context
+            let conversationName = ConversationStore.shared.getJoinedConversation(conversationId)?.conversation.displayName ?? "Room"
+            NotificationService.shared.sendMentionNotification(from: message.sender, message: "\(conversationName): \(message.content)")
+        }
+        
+        #if os(iOS)
+        // Haptic feedback for room messages (lighter than private messages)
+        guard UIApplication.shared.applicationState == .active else { return }
+        
+        if message.sender != nickname {
+            let impactFeedback = UIImpactFeedbackGenerator(style: isMentioned ? .medium : .light)
+            impactFeedback.impactOccurred()
+        }
+        #endif
+    }
+    
+    private func addRoomMessage(_ message: BitchatMessage, to conversationId: Data) {
+        // Add message to the conversation
+        if joinedConversations[conversationId] == nil {
+            joinedConversations[conversationId] = []
+        }
+        
+        joinedConversations[conversationId]?.append(message)
+        
+        // Trim messages if needed to prevent memory issues
+        trimRoomMessagesIfNeeded(for: conversationId)
+    }
+    
+    private func trimRoomMessagesIfNeeded(for conversationId: Data) {
+        guard var messages = joinedConversations[conversationId],
+              messages.count > maxRoomMessages else { return }
+        
+        // Keep only the most recent messages
+        let messagesToKeep = messages.suffix(maxRoomMessages)
+        joinedConversations[conversationId] = Array(messagesToKeep)
+        
+        SecureLogger.log("Trimmed room messages for conversation \(conversationId.hexEncodedString().prefix(8)) - kept \(messagesToKeep.count) out of \(messages.count)", 
+                       category: SecureLogger.session, level: .debug)
+    }
+    
+    // MARK: - Conversation Management
+    
+    /// Join a conversation/room
+    func joinConversation(_ conversation: Conversation) {
+        ConversationStore.shared.joinConversation(conversation)
+        
+        // Initialize empty message history for this conversation
+        joinedConversations[conversation.id] = []
+        
+        // Remove from unread if present
+        unreadRoomMessages.remove(conversation.id)
+        
+        SecureLogger.log("Joined conversation: \(conversation.displayName)", 
+                       category: SecureLogger.session, level: .info)
+    }
+    
+    /// Leave a conversation/room
+    func leaveConversation(conversationId: Data) {
+        // Get conversation details before leaving for logging
+        let conversationName = ConversationStore.shared.getJoinedConversation(conversationId)?.conversation.displayName ?? "Unknown"
+        
+        ConversationStore.shared.leaveConversation(conversationId: conversationId)
+        
+        // Clear local message history
+        joinedConversations.removeValue(forKey: conversationId)
+        
+        // Clear from unread
+        unreadRoomMessages.remove(conversationId)
+        
+        // If this was the selected conversation, clear selection
+        if selectedConversation == conversationId {
+            selectedConversation = nil
+        }
+        
+        SecureLogger.log("Left conversation: \(conversationName)", 
+                       category: SecureLogger.session, level: .info)
+    }
+    
+    /// Get messages for a specific conversation
+    func getMessagesForConversation(_ conversationId: Data) -> [BitchatMessage] {
+        return joinedConversations[conversationId] ?? []
+    }
+    
+    /// Mark a conversation as read and clear unread status
+    func markConversationAsRead(_ conversationId: Data) {
+        unreadRoomMessages.remove(conversationId)
+        ConversationStore.shared.markAsRead(conversationId: conversationId)
+    }
+    
+    /// Select a conversation for viewing
+    func selectConversation(_ conversationId: Data?) {
+        // Mark previous conversation as read if we were viewing one
+        if let previousConversation = selectedConversation {
+            markConversationAsRead(previousConversation)
+        }
+        
+        selectedConversation = conversationId
+        
+        // Mark new conversation as read
+        if let newConversation = conversationId {
+            markConversationAsRead(newConversation)
+        }
+    }
+    
+    /// Get joined conversations with unread counts
+    func getJoinedConversationsWithStatus() -> [ConversationStore.JoinedConversation] {
+        return ConversationStore.shared.getAllJoinedConversations()
+    }
+    
+    /// Get total unread room message count
+    func getTotalUnreadRoomCount() -> Int {
+        return unreadRoomMessages.count
+    }
+    
+    /// Send a message to a specific conversation/room
+    func sendToConversation(_ content: String, conversationId: Data, mentions: [String] = []) {
+        // Ensure we're joined to this conversation
+        guard ConversationStore.shared.isJoined(conversationId) else {
+            SecureLogger.log("Cannot send message - not joined to conversation", 
+                           category: SecureLogger.session, level: .warning)
+            return
+        }
+        
+        // Validate content
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else { return }
+        
+        // Create optimistic message for immediate UI feedback
+        let optimisticMessage = BitchatMessage(
+            sender: nickname,
+            content: trimmedContent,
+            timestamp: Date(),
+            isRelay: false,
+            originalSender: nil,
+            isPrivate: false,
+            recipientNickname: nil,
+            senderPeerID: meshService.myPeerID,
+            mentions: mentions.isEmpty ? nil : mentions,
+            deliveryStatus: .sending
+        )
+        
+        // Add to local conversation immediately for responsive UI
+        addRoomMessage(optimisticMessage, to: conversationId)
+        
+        // Send via mesh service
+        meshService.sendRoomMessage(trimmedContent, in: conversationId, mentions: mentions, messageID: optimisticMessage.id)
+        
+        // Clear unread status for this conversation since we just sent to it
+        unreadRoomMessages.remove(conversationId)
+        ConversationStore.shared.markAsRead(conversationId: conversationId)
+        
+        SecureLogger.log("Sent message to conversation \(conversationId.hexEncodedString().prefix(8)): \(trimmedContent.prefix(50))", 
+                       category: SecureLogger.session, level: .debug)
     }
     
     // MARK: - Peer Connection Events

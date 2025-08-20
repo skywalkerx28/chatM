@@ -14,6 +14,22 @@ enum TopicManager {
         let camp = blake3_8("campus|\(campusId)") + blake3_8("campus2|\(campusId)")
         return camp + course + session
     }
+    
+    // MARK: - Reserved Conversation IDs
+    
+    /// Generate deterministic conversation ID for campus-wide announcements
+    static func announcementsId(campusId: String) -> Data {
+        let camp = blake3_8("campus|\(campusId)") + blake3_8("campus2|\(campusId)")
+        let announcements = blake3_8("ANNOUNCEMENTS") + blake3_8("SYSTEM")
+        return camp + announcements
+    }
+    
+    /// Generate deterministic conversation ID for campus-wide general chat
+    static func generalId(campusId: String) -> Data {
+        let camp = blake3_8("campus|\(campusId)") + blake3_8("campus2|\(campusId)")
+        let general = blake3_8("GENERAL") + blake3_8("CHAT")
+        return camp + general
+    }
 }
 
 

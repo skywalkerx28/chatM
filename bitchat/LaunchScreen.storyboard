@@ -16,18 +16,10 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="chatM" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="26" y="326" width="341.33333333333331" height="200"/>
-                            </imageView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <constraints>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="centerX-logo"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="centerY-logo"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="height" relation="lessThanOrEqual" constant="200" id="max-height"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="leading" relation="greaterThanOrEqual" secondItem="Bcu-3y-fUS" secondAttribute="leading" id="min-leading"/>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="trailing" relation="greaterThanOrEqual" secondItem="GJd-Yh-RWb" secondAttribute="trailing" id="min-trailing"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -37,6 +29,5 @@
         </scene>
     </scenes>
     <resources>
-        <image name="chatM" width="341.33334350585938" height="341.33334350585938"/>
     </resources>
 </document>

@@ -13,9 +13,9 @@ import os.log
 class KeychainManager {
     static let shared = KeychainManager()
     
-    // Use consistent service name for all keychain items
-    private let service = "chat.chatm"
-    private let appGroup = "group.chat.chatm"
+    // Use consistent service name for all keychain items - mchat specific
+    private let service = "chat.mchat"
+    private let appGroup = "group.chat.mchat"
     
     private init() {}
     
@@ -90,7 +90,7 @@ class KeychainManager {
         ]
         
         // Add a label for easier debugging
-        query[kSecAttrLabel as String] = "chatM-\(key)"
+        query[kSecAttrLabel as String] = "mchat-\(key)"
         
         // Always use app group when available for consistent behavior
         // This ensures keychain items are properly isolated to our app

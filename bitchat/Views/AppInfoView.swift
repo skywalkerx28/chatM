@@ -18,6 +18,7 @@ struct AppInfoView: View {
     
     // MARK: - Constants
     private enum Strings {
+        
         static let appName = "chatM"
         static let tagline = "subgroupchat"
         

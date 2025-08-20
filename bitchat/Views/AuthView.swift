@@ -30,7 +30,7 @@ struct AuthView: View {
                 .frame(maxHeight: 45)
 
             ZStack(alignment: .bottom) {
-                Image("chatM")
+                Image("Mchat")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 360, height: 160)

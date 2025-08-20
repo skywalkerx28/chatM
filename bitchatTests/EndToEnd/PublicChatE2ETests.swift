@@ -36,6 +36,7 @@ final class PublicChatE2ETests: XCTestCase {
         bob = nil
         charlie = nil
         david = nil
+        MockBluetoothMeshService.clearRegistry()
         super.tearDown()
     }
     
@@ -405,6 +406,195 @@ final class PublicChatE2ETests: XCTestCase {
         wait(for: [expectation], timeout: TestConstants.defaultTimeout)
     }
     
+    // MARK: - Room Message E2E Tests
+    
+    func testRoomMessageBasicFlow() {
+        // Setup: Alice and Bob connected, both with valid campus presence
+        simulateConnection(alice, bob)
+        
+        let campusId = "test.university.edu"
+        let conversationId = TopicManager.generalId(campusId: campusId)
+        
+        // Setup campus presence for both peers
+        alice.setupCampusPresence(campusId: campusId)
+        bob.setupCampusPresence(campusId: campusId)
+        
+        // Join conversation on both sides
+        alice.joinConversation(conversationId)
+        bob.joinConversation(conversationId)
+        
+        let expectation = XCTestExpectation(description: "Bob receives room message")
+        
+        bob.roomMessageDeliveryHandler = { roomMessage in
+            if roomMessage.content == "Hello General room!" && 
+               roomMessage.conversationId == conversationId {
+                expectation.fulfill()
+            }
+        }
+        
+        // Alice sends room message
+        alice.sendRoomMessage("Hello General room!", in: conversationId)
+        
+        wait(for: [expectation], timeout: TestConstants.shortTimeout)
+    }
+    
+    func testRoomMessageWithCampusGateBlocking() {
+        // Setup: Alice and Bob connected, but different campuses
+        simulateConnection(alice, bob)
+        
+        let aliceCampusId = "university1.edu"
+        let bobCampusId = "university2.edu"
+        let conversationId = TopicManager.generalId(campusId: aliceCampusId)
+        
+        // Setup different campus presence
+        alice.setupCampusPresence(campusId: aliceCampusId)
+        bob.setupCampusPresence(campusId: bobCampusId)
+        
+        // Alice joins conversation for her campus
+        alice.joinConversation(conversationId)
+        // Bob tries to join conversation for Alice's campus (should be blocked)
+        bob.joinConversation(conversationId)
+        
+        let expectation = XCTestExpectation(description: "Bob should NOT receive blocked message")
+        expectation.isInverted = true // We expect this NOT to be fulfilled
+        
+        bob.roomMessageDeliveryHandler = { roomMessage in
+            if roomMessage.content == "Cross-campus message" {
+                expectation.fulfill() // This should not happen
+            }
+        }
+        
+        // Alice sends room message (Bob should not receive due to CampusGate)
+        alice.sendRoomMessage("Cross-campus message", in: conversationId)
+        
+        wait(for: [expectation], timeout: TestConstants.shortTimeout)
+    }
+    
+    func testRoomMessageRelayWithTTL() {
+        // Linear topology: Alice -> Bob -> Charlie, all same campus
+        simulateConnection(alice, bob)
+        simulateConnection(bob, charlie)
+        
+        let campusId = "test.university.edu"
+        let conversationId = TopicManager.generalId(campusId: campusId)
+        
+        // Setup campus presence for all peers
+        alice.setupCampusPresence(campusId: campusId)
+        bob.setupCampusPresence(campusId: campusId)
+        charlie.setupCampusPresence(campusId: campusId)
+        
+        // All join the same conversation
+        alice.joinConversation(conversationId)
+        bob.joinConversation(conversationId)
+        charlie.joinConversation(conversationId)
+        
+        let charlieExpectation = XCTestExpectation(description: "Charlie receives relayed room message")
+        
+        charlie.roomMessageDeliveryHandler = { roomMessage in
+            if roomMessage.content == "Relayed room message" && 
+               roomMessage.conversationId == conversationId {
+                charlieExpectation.fulfill()
+            }
+        }
+        
+        // Alice sends message, should reach Charlie via Bob
+        alice.sendRoomMessage("Relayed room message", in: conversationId)
+        
+        wait(for: [charlieExpectation], timeout: TestConstants.defaultTimeout)
+    }
+    
+    func testAnnouncementsRoomAccessibility() {
+        // Setup: Alice and Bob connected, same campus
+        simulateConnection(alice, bob)
+        
+        let campusId = "test.university.edu"
+        let announcementsId = TopicManager.announcementsId(campusId: campusId)
+        
+        // Setup campus presence
+        alice.setupCampusPresence(campusId: campusId)
+        bob.setupCampusPresence(campusId: campusId)
+        
+        // Note: Announcements should be accessible even without explicit join
+        
+        let expectation = XCTestExpectation(description: "Bob receives announcement")
+        
+        bob.roomMessageDeliveryHandler = { roomMessage in
+            if roomMessage.content == "Important campus announcement" && 
+               roomMessage.conversationId == announcementsId {
+                expectation.fulfill()
+            }
+        }
+        
+        // Alice sends announcement
+        alice.sendRoomMessage("Important campus announcement", in: announcementsId)
+        
+        wait(for: [expectation], timeout: TestConstants.shortTimeout)
+    }
+    
+    func testRoomMessageWithMentions() {
+        // Setup: Alice and Bob connected, same campus and room
+        simulateConnection(alice, bob)
+        
+        let campusId = "test.university.edu"
+        let conversationId = TopicManager.generalId(campusId: campusId)
+        
+        // Setup campus presence
+        alice.setupCampusPresence(campusId: campusId)
+        bob.setupCampusPresence(campusId: campusId)
+        
+        // Join conversation
+        alice.joinConversation(conversationId)
+        bob.joinConversation(conversationId)
+        
+        let expectation = XCTestExpectation(description: "Bob receives room message with mentions")
+        
+        bob.roomMessageDeliveryHandler = { roomMessage in
+            if roomMessage.content == "Hey @bob, check this out!" && 
+               roomMessage.mentions?.contains("bob") == true {
+                expectation.fulfill()
+            }
+        }
+        
+        // Alice sends message mentioning Bob
+        alice.sendRoomMessage("Hey @bob, check this out!", in: conversationId, mentions: ["bob"])
+        
+        wait(for: [expectation], timeout: TestConstants.shortTimeout)
+    }
+    
+    func testRoomMessageNotDeliveredWhenNotJoined() {
+        // Setup: Alice and Bob connected, same campus
+        simulateConnection(alice, bob)
+        
+        let campusId = "test.university.edu"
+        let conversationId = TopicManager.courseId(dept: "PRIVATE", num: "999", term: "FALL2024")
+        let fullConversationId = TopicManager.topicCode(
+            campusId: campusId, 
+            course: conversationId, 
+            session: Data(repeating: 0, count: 8)
+        )
+        
+        // Setup campus presence
+        alice.setupCampusPresence(campusId: campusId)
+        bob.setupCampusPresence(campusId: campusId)
+        
+        // Alice joins conversation, Bob does NOT
+        alice.joinConversation(fullConversationId)
+        
+        let expectation = XCTestExpectation(description: "Bob should NOT receive message from unjoined room")
+        expectation.isInverted = true
+        
+        bob.roomMessageDeliveryHandler = { roomMessage in
+            if roomMessage.conversationId == fullConversationId {
+                expectation.fulfill() // This should not happen
+            }
+        }
+        
+        // Alice sends message to room Bob hasn't joined
+        alice.sendRoomMessage("Private room message", in: fullConversationId)
+        
+        wait(for: [expectation], timeout: TestConstants.shortTimeout)
+    }
+    
     // MARK: - Helper Methods
     
     private func createMockService(peerID: String, nickname: String) -> MockBluetoothMeshService {
@@ -445,7 +635,7 @@ final class PublicChatE2ETests: XCTestCase {
                 if let relayPayload = relayMessage.toBinaryPayload() {
                     let relayPacket = BitchatPacket(
                         type: packet.type,
-                        senderID: node.peerID.data(using: .utf8)!,
+                        senderID: node.peerID.data(using: .utf8) ?? Data(),
                         recipientID: packet.recipientID,
                         timestamp: packet.timestamp,
                         payload: relayPayload,

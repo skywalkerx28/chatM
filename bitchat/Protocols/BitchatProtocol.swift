@@ -151,6 +151,7 @@ enum MessageType: UInt8 {
     case noiseHandshakeResp = 0x11  // Noise handshake response
     case noiseEncrypted = 0x12      // Noise encrypted transport message
     case noiseIdentityAnnounce = 0x13  // Announce static public key for discovery
+    case roomMessage = 0x14         // Room/channel message with conversation ID
     
     // Protocol-level acknowledgments
     case protocolAck = 0x22             // Generic protocol acknowledgment
@@ -177,6 +178,7 @@ enum MessageType: UInt8 {
         case .noiseHandshakeResp: return "noiseHandshakeResp"
         case .noiseEncrypted: return "noiseEncrypted"
         case .noiseIdentityAnnounce: return "noiseIdentityAnnounce"
+        case .roomMessage: return "roomMessage"
         case .protocolAck: return "protocolAck"
         case .protocolNack: return "protocolNack"
         case .systemValidation: return "systemValidation"

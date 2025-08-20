@@ -16,6 +16,7 @@ import AWSCognitoAuthPlugin
 struct ChatMApp: App {
     @StateObject private var chatViewModel = ChatViewModel()
     @StateObject private var authManager = AuthManager()
+    @State private var showingSplash = true
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     #elseif os(macOS)
@@ -31,17 +32,21 @@ struct ChatMApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                #if os(iOS)
-                if authManager.isAuthenticated {
-                    HomeView(auth: authManager)
-                        .environmentObject(chatViewModel)
+                if showingSplash {
+                    SplashView()
                 } else {
-                    AuthView(auth: authManager)
+                    #if os(iOS)
+                    if authManager.isAuthenticated {
+                        HomeView(auth: authManager)
+                            .environmentObject(chatViewModel)
+                    } else {
+                        AuthView(auth: authManager)
+                    }
+                    #else
+                    ContentView()
+                        .environmentObject(chatViewModel)
+                    #endif
                 }
-                #else
-                ContentView()
-                    .environmentObject(chatViewModel)
-                #endif
             }
                 .onAppear {
                     NotificationDelegate.shared.chatViewModel = chatViewModel
@@ -50,6 +55,14 @@ struct ChatMApp: App {
                     #elseif os(macOS)
                     appDelegate.chatViewModel = chatViewModel
                     #endif
+                    
+                    // Hide splash screen after 3 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            showingSplash = false
+                        }
+                    }
+                    
                     // Check for shared content
                     checkForSharedContent()
                 }
@@ -90,7 +103,7 @@ struct ChatMApp: App {
     
     private func checkForSharedContent() {
         // Check app group for shared content from extension
-        guard let userDefaults = UserDefaults(suiteName: "group.chat.chatm") else {
+        guard let userDefaults = UserDefaults(suiteName: "group.chat.mchat") else {
             return
         }
         
@@ -207,6 +220,49 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         
         // Show notification in all other cases
         completionHandler([.banner, .sound])
+    }
+}
+
+// MARK: - Splash Screen View
+struct SplashView: View {
+    @Environment(\.colorScheme) var colorScheme
+    @State private var revealProgress: CGFloat = 0.0
+    @State private var opacity: Double = 1.0
+    @State private var scale: CGFloat = 1.0
+    
+    var body: some View {
+        VStack {
+            Spacer()
+                .frame(maxHeight: 245) // Limit top spacer to push logo higher
+            
+            GeometryReader { geometry in
+                Image("Mchat")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 341, maxHeight: 200)
+                    .mask(
+                        HStack(spacing: 0) {
+                            Rectangle()
+                                .frame(width: geometry.size.width * revealProgress)
+                            Spacer()
+                        }
+                    )
+                    .opacity(opacity)
+                    .scaleEffect(scale)
+            }
+            .frame(maxWidth: 341, maxHeight: 200)
+            
+            Spacer() // Bottom spacer takes remaining space
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(colorScheme == .dark ? Color.black : Color.white)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5)) {
+                revealProgress = 1.0
+                opacity = 1.0
+                scale = 1.0
+            }
+        }
     }
 }
 

@@ -1,17 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "chatM_logo.png",
+      "filename" : "Mchat_logo1_transparent.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "chatM_logo 1.png",
+      "filename" : "Mchat_logo1_transparent 1.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
-      "filename" : "chatM_logo 2.png",
+      "filename" : "Mchat_logo1_transparent 2.png",
       "idiom" : "universal",
       "scale" : "3x"
     }

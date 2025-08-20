@@ -137,6 +137,6 @@ struct InputValidator {
 
 private extension Character {
     var isHexDigit: Bool {
-        return "0123456789abcdefABCDEF".contains(self)
+        return self.isWholeNumber || ("a"..."f").contains(self.lowercased()) || ("A"..."F").contains(self)
     }
 }

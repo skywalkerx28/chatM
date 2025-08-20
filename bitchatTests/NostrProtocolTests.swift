@@ -13,8 +13,6 @@ final class NostrProtocolTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        // Enable secure logging for tests
-        SecureLogger.enableLogging()
     }
     
     func testNIP17MessageRoundTrip() throws {
