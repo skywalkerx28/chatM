@@ -1,6 +1,6 @@
 //
 // TestHelpers.swift
-// bitchatTests
+// MchatTests           
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -34,8 +34,8 @@ class TestHelpers {
         isPrivate: Bool = false,
         recipientNickname: String? = nil,
         mentions: [String]? = nil
-    ) -> BitchatMessage {
-        return BitchatMessage(
+    ) -> MchatMessage {
+        return MchatMessage(
             id: UUID().uuidString,
             sender: sender,
             content: content,

@@ -81,11 +81,9 @@ struct MessagePadding {
         
         var padded = data
         
-        // Standard PKCS#7 padding
-        var randomBytes = [UInt8](repeating: 0, count: paddingNeeded - 1)
-        _ = SecRandomCopyBytes(kSecRandomDefault, paddingNeeded - 1, &randomBytes)
-        padded.append(contentsOf: randomBytes)
-        padded.append(UInt8(paddingNeeded))
+        // Standard PKCS#7 padding: each padding byte equals padding length
+        let padValue = UInt8(paddingNeeded)
+        padded.append(contentsOf: [UInt8](repeating: padValue, count: paddingNeeded))
         
         return padded
     }
@@ -103,7 +101,29 @@ struct MessagePadding {
             return data 
         }
         
-        let result = data.prefix(data.count - paddingLength)
+        // Validate PKCS#7 padding - all padding bytes should have the same value
+        guard paddingLength <= 255 else { return data } // PKCS#7 max padding
+        
+        let paddingStart = data.count - paddingLength
+        var allEqual = true
+        for i in paddingStart..<data.count {
+            if data[i] != UInt8(paddingLength) {
+                allEqual = false
+                break
+            }
+        }
+        // If bytes are not equal (legacy random padding style), we still avoid unpadding
+        // to prevent accidental truncation of unpadded or truncated packets
+        guard allEqual else { return data }
+        
+        // Ensure the unpadded size is at least the strict minimum packet size
+        // (header + senderID). If not, treat as invalid padding and return original.
+        let unpaddedLength = data.count - paddingLength
+        if unpaddedLength < BinaryProtocol.headerSize + BinaryProtocol.senderIDSize {
+            return data
+        }
+        
+        let result = Data(data.prefix(data.count - paddingLength))
         
         // Debug logging for 243-byte packets
         if data.count == 243 {
@@ -138,20 +158,20 @@ struct MessagePadding {
 enum MessageType: UInt8 {
     case announce = 0x01
     case leave = 0x03
-    case message = 0x04  // All user messages (private and broadcast)
+    case message = 0x04                // All user messages (private and broadcast)
     case fragmentStart = 0x05
     case fragmentContinue = 0x06
     case fragmentEnd = 0x07
-    case deliveryAck = 0x0A  // Acknowledge message received
+    case deliveryAck = 0x0A            // Acknowledge message received
     case deliveryStatusRequest = 0x0B  // Request delivery status update
-    case readReceipt = 0x0C  // Message has been read/viewed
+    case readReceipt = 0x0C            // Message has been read/viewed
     
     // Noise Protocol messages
-    case noiseHandshakeInit = 0x10  // Noise handshake initiation
-    case noiseHandshakeResp = 0x11  // Noise handshake response
-    case noiseEncrypted = 0x12      // Noise encrypted transport message
+    case noiseHandshakeInit = 0x10     // Noise handshake initiation
+    case noiseHandshakeResp = 0x11     // Noise handshake response
+    case noiseEncrypted = 0x12         // Noise encrypted transport message
     case noiseIdentityAnnounce = 0x13  // Announce static public key for discovery
-    case roomMessage = 0x14         // Room/channel message with conversation ID
+    case roomMessage = 0x14            // Channel message with conversation ID
     
     // Protocol-level acknowledgments
     case protocolAck = 0x22             // Generic protocol acknowledgment
@@ -224,8 +244,9 @@ struct BitchatPacket: Codable {
     let payload: Data
     let signature: Data?
     var ttl: UInt8
+    let campusRequired: Bool  // Whether this packet requires campus-gate enforcement
     
-    init(type: UInt8, senderID: Data, recipientID: Data?, timestamp: UInt64, payload: Data, signature: Data?, ttl: UInt8) {
+    init(type: UInt8, senderID: Data, recipientID: Data?, timestamp: UInt64, payload: Data, signature: Data?, ttl: UInt8, campusRequired: Bool? = nil) {
         self.version = 1
         self.type = type
         self.senderID = senderID
@@ -234,6 +255,8 @@ struct BitchatPacket: Codable {
         self.payload = payload
         self.signature = signature
         self.ttl = ttl
+        // Auto-detect campus requirement if not explicitly set
+        self.campusRequired = campusRequired ?? (type == MessageType.roomMessage.rawValue)
     }
     
     // Convenience initializer for new binary format
@@ -256,6 +279,8 @@ struct BitchatPacket: Codable {
         self.payload = payload
         self.signature = nil
         self.ttl = ttl
+        // Auto-detect campus requirement
+        self.campusRequired = (type == MessageType.roomMessage.rawValue)
     }
     
     var data: Data? {
@@ -943,13 +968,13 @@ enum DeliveryStatus: Codable, Equatable {
     }
 }
 
-// MARK: - Message Model
+// MARK: - Unified Message Model
 
-/// Represents a user-visible message in the BitChat system.
-/// Handles both broadcast messages and private encrypted messages,
-/// with support for mentions, replies, and delivery tracking.
-/// - Note: This is the primary data model for chat messages
-class BitchatMessage: Codable {
+/// Represents a user-visible message in the Mchat system.
+/// Unified model that handles all user content types: broadcasts, rooms, and private messages.
+/// Replaces the old BitchatMessage with conversationId support for room-aware messaging.
+/// - Note: This is the primary data model for all chat messages in Mchat
+class MchatMessage: Codable {
     let id: String
     let sender: String
     let content: String
@@ -961,6 +986,9 @@ class BitchatMessage: Codable {
     let senderPeerID: String?
     let mentions: [String]?  // Array of mentioned nicknames
     var deliveryStatus: DeliveryStatus? // Delivery tracking
+    
+    // MARK: - Room/Conversation Support
+    let conversationId: Data?  // 32-byte conversation ID for room messages, nil for legacy broadcasts
     
     // Cached formatted text (not included in Codable)
     private var _cachedFormattedText: [String: AttributedString] = [:]
@@ -976,10 +1004,10 @@ class BitchatMessage: Codable {
     // Codable implementation
     enum CodingKeys: String, CodingKey {
         case id, sender, content, timestamp, isRelay, originalSender
-        case isPrivate, recipientNickname, senderPeerID, mentions, deliveryStatus
+        case isPrivate, recipientNickname, senderPeerID, mentions, deliveryStatus, conversationId
     }
     
-    init(id: String? = nil, sender: String, content: String, timestamp: Date, isRelay: Bool, originalSender: String? = nil, isPrivate: Bool = false, recipientNickname: String? = nil, senderPeerID: String? = nil, mentions: [String]? = nil, deliveryStatus: DeliveryStatus? = nil) {
+    init(id: String? = nil, sender: String, content: String, timestamp: Date, isRelay: Bool, originalSender: String? = nil, isPrivate: Bool = false, recipientNickname: String? = nil, senderPeerID: String? = nil, mentions: [String]? = nil, deliveryStatus: DeliveryStatus? = nil, conversationId: Data? = nil) {
         self.id = id ?? UUID().uuidString
         self.sender = sender
         self.content = content
@@ -991,12 +1019,58 @@ class BitchatMessage: Codable {
         self.senderPeerID = senderPeerID
         self.mentions = mentions
         self.deliveryStatus = deliveryStatus ?? (isPrivate ? .sending : nil)
+        self.conversationId = conversationId
+    }
+    
+    // MARK: - Bridging Helpers for Room Integration
+    
+    /// Create MchatMessage from RoomMessage for unified handling
+    convenience init(roomMessage: RoomMessage, senderPeerID: String?) {
+        self.init(
+            id: roomMessage.messageId,
+            sender: roomMessage.sender,
+            content: roomMessage.content,
+            timestamp: roomMessage.timestamp,
+            isRelay: false,
+            originalSender: nil,
+            isPrivate: false,
+            recipientNickname: nil,
+            senderPeerID: senderPeerID,
+            mentions: roomMessage.mentions,
+            deliveryStatus: nil,
+            conversationId: roomMessage.conversationId
+        )
+    }
+    
+    /// Convert MchatMessage to RoomMessage for transmission
+    func toRoomMessage(defaultConversationId: Data? = nil) -> RoomMessage? {
+        let roomConversationId = conversationId ?? defaultConversationId
+        guard let roomConversationId = roomConversationId else { return nil }
+        
+        return RoomMessage(
+            conversationId: roomConversationId,
+            messageId: id,
+            sender: sender,
+            content: content,
+            timestamp: timestamp,
+            mentions: mentions
+        )
+    }
+    
+    /// Check if this is a room message (has conversationId)
+    var isRoomMessage: Bool {
+        return conversationId != nil
+    }
+    
+    /// Check if this is a legacy broadcast message (no conversationId)
+    var isLegacyBroadcast: Bool {
+        return conversationId == nil && !isPrivate
     }
 }
 
-// Equatable conformance for BitchatMessage
-extension BitchatMessage: Equatable {
-    static func == (lhs: BitchatMessage, rhs: BitchatMessage) -> Bool {
+// Equatable conformance for MchatMessage
+extension MchatMessage: Equatable {
+    static func == (lhs: MchatMessage, rhs: MchatMessage) -> Bool {
         return lhs.id == rhs.id &&
                lhs.sender == rhs.sender &&
                lhs.content == rhs.content &&
@@ -1007,9 +1081,15 @@ extension BitchatMessage: Equatable {
                lhs.recipientNickname == rhs.recipientNickname &&
                lhs.senderPeerID == rhs.senderPeerID &&
                lhs.mentions == rhs.mentions &&
-               lhs.deliveryStatus == rhs.deliveryStatus
+               lhs.deliveryStatus == rhs.deliveryStatus &&
+               lhs.conversationId == rhs.conversationId
     }
 }
+
+// MARK: - Legacy Compatibility
+
+/// Backward compatibility typealias - gradually migrate all BitchatMessage references to MchatMessage
+typealias BitchatMessage = MchatMessage
 
 // MARK: - Delegate Protocol
 

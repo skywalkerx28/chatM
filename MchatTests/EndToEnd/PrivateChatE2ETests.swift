@@ -1,6 +1,6 @@
 //
 // PrivateChatE2ETests.swift
-// bitchatTests
+// MchatTests
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -31,6 +31,7 @@ final class PrivateChatE2ETests: XCTestCase {
         deliveryTracker = DeliveryTracker.shared
         retryService = MessageRetryService.shared
         retryService.meshService = alice
+        retryService.connectivityProvider = alice
         
         // Clear any existing state
         deliveryTracker.clearDeliveryStatus(for: "")
@@ -125,7 +126,7 @@ final class PrivateChatE2ETests: XCTestCase {
         
         // Setup Bob to generate ACK
         bob.packetDeliveryHandler = { packet in
-            if let message = BitchatMessage.fromBinaryPayload(packet.payload),
+            if let message = MchatMessage.fromBinaryPayload(packet.payload),
                message.isPrivate {
                 // Generate ACK
                 if let ack = self.deliveryTracker.generateAck(
@@ -157,7 +158,7 @@ final class PrivateChatE2ETests: XCTestCase {
         }
         
         // Track the message
-        let trackedMessage = BitchatMessage(
+        let trackedMessage = MchatMessage(
             id: messageID,
             sender: TestConstants.testNickname1,
             content: TestConstants.testMessage1,
@@ -208,7 +209,7 @@ final class PrivateChatE2ETests: XCTestCase {
             }
         }
         
-        let trackedMessage = BitchatMessage(
+        let trackedMessage = MchatMessage(
             id: messageID,
             sender: TestConstants.testNickname1,
             content: TestConstants.testMessage1,
@@ -354,7 +355,7 @@ final class PrivateChatE2ETests: XCTestCase {
         alice.packetDeliveryHandler = { packet in
             // Encrypt outgoing private messages
             if packet.type == 0x01,
-               let message = BitchatMessage.fromBinaryPayload(packet.payload),
+               let message = MchatMessage.fromBinaryPayload(packet.payload),
                message.isPrivate {
                 do {
                     let encrypted = try aliceManager.encrypt(packet.payload, for: TestConstants.testPeerID2)
@@ -379,7 +380,7 @@ final class PrivateChatE2ETests: XCTestCase {
             if packet.type == 0x02 {
                 do {
                     let decrypted = try bobManager.decrypt(packet.payload, from: TestConstants.testPeerID1)
-                    if let message = BitchatMessage.fromBinaryPayload(decrypted) {
+                    if let message = MchatMessage.fromBinaryPayload(decrypted) {
                         XCTAssertEqual(message.content, TestConstants.testMessage1)
                         XCTAssertTrue(message.isPrivate)
                         expectation.fulfill()
@@ -468,6 +469,21 @@ final class PrivateChatE2ETests: XCTestCase {
         wait(for: [expectation], timeout: TestConstants.longTimeout)
         XCTAssertEqual(receivedCount, messageCount)
     }
+
+    func testDMBinsKeepSinglePDUForShortMessages() {
+        simulateConnection(alice, bob)
+        
+        // Small DM should be padded to a small bin and deliver promptly
+        let expectation = XCTestExpectation(description: "Small DM delivered")
+        bob.messageDeliveryHandler = { message in
+            if message.isPrivate && message.content == "bin test" {
+                expectation.fulfill()
+            }
+        }
+        
+        alice.sendPrivateMessage("bin test", to: TestConstants.testPeerID2, recipientNickname: TestConstants.testNickname2)
+        wait(for: [expectation], timeout: TestConstants.defaultTimeout)
+    }
     
     func testLargePrivateMessage() {
         simulateConnection(alice, bob)
@@ -523,7 +539,7 @@ final class PrivateChatE2ETests: XCTestCase {
         }
         
         // Create message
-        let message = BitchatMessage(
+        let message = MchatMessage(
             id: messageID,
             sender: TestConstants.testNickname1,
             content: TestConstants.testMessage1,
@@ -571,7 +587,7 @@ final class PrivateChatE2ETests: XCTestCase {
     }
     
     private func simulateConnection(_ peer1: MockBluetoothMeshService, _ peer2: MockBluetoothMeshService) {
-        peer1.simulateConnectedPeer(peer2.peerID)
-        peer2.simulateConnectedPeer(peer1.peerID)
+        peer1.simulateConnectedPeer(peer2.myPeerID)
+        peer2.simulateConnectedPeer(peer1.myPeerID)
     }
 }

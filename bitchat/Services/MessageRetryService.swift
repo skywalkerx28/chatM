@@ -1,6 +1,6 @@
 //
 // MessageRetryService.swift
-// bitchat
+// Mchat
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -9,6 +9,11 @@
 import Foundation
 import Combine
 import CryptoKit
+
+// Protocol for connectivity checking - allows clean testing without coupling to UI
+protocol ConnectivityProvider: AnyObject {
+    var connectedPeerIDs: [String] { get }
+}
 
 struct RetryableMessage {
     let id: String
@@ -33,6 +38,7 @@ class MessageRetryService {
     private let maxQueueSize = 50
     
     weak var meshService: BluetoothMeshService?
+    weak var connectivityProvider: ConnectivityProvider?
     
     private init() {
         startRetryTimer()
@@ -139,8 +145,15 @@ class MessageRetryService {
                       let meshService = self.meshService else { return }
                 
                 // Check connectivity before retrying
-                let viewModel = meshService.delegate as? ChatViewModel
-                let connectedPeers = viewModel?.connectedPeers ?? []
+                // Priority: 1) Explicit connectivity provider, 2) UI delegate as fallback
+                let connectedPeers: [String]
+                if let provider = self.connectivityProvider {
+                    connectedPeers = provider.connectedPeerIDs
+                } else if let viewModel = meshService.delegate as? ChatViewModel {
+                    connectedPeers = viewModel.connectedPeers
+                } else {
+                    connectedPeers = []
+                }
                 
                 if message.isPrivate {
                     // For private messages, check if recipient is connected
@@ -154,21 +167,23 @@ class MessageRetryService {
                             messageID: message.originalMessageID
                         )
                     } else {
-                        // Recipient not connected, keep in queue with updated retry time
-                        var updatedMessage = message
-                        updatedMessage = RetryableMessage(
-                            id: message.id,
-                            originalMessageID: message.originalMessageID,
-                            originalTimestamp: message.originalTimestamp,
-                            content: message.content,
-                            mentions: message.mentions,
-                            isPrivate: message.isPrivate,
-                            recipientPeerID: message.recipientPeerID,
-                            recipientNickname: message.recipientNickname,
-                            retryCount: message.retryCount + 1,
-                            nextRetryTime: Date().addingTimeInterval(self.retryInterval * Double(message.retryCount + 2))
-                        )
-                        self.retryQueue.append(updatedMessage)
+                        // Recipient not connected, reschedule with exponential backoff
+                        if message.retryCount < message.maxRetries {
+                            let backoffDelay = self.retryInterval * pow(2.0, Double(message.retryCount))
+                            let updatedMessage = RetryableMessage(
+                                id: message.id,
+                                originalMessageID: message.originalMessageID,
+                                originalTimestamp: message.originalTimestamp,
+                                content: message.content,
+                                mentions: message.mentions,
+                                isPrivate: message.isPrivate,
+                                recipientPeerID: message.recipientPeerID,
+                                recipientNickname: message.recipientNickname,
+                                retryCount: message.retryCount + 1,
+                                nextRetryTime: Date().addingTimeInterval(backoffDelay)
+                            )
+                            self.retryQueue.append(updatedMessage)
+                        }
                     }
                 } else {
                     // Regular message
@@ -181,21 +196,23 @@ class MessageRetryService {
                             timestamp: message.originalTimestamp
                         )
                     } else {
-                        // No peers connected, keep in queue
-                        var updatedMessage = message
-                        updatedMessage = RetryableMessage(
-                            id: message.id,
-                            originalMessageID: message.originalMessageID,
-                            originalTimestamp: message.originalTimestamp,
-                            content: message.content,
-                            mentions: message.mentions,
-                            isPrivate: message.isPrivate,
-                            recipientPeerID: message.recipientPeerID,
-                            recipientNickname: message.recipientNickname,
-                            retryCount: message.retryCount + 1,
-                            nextRetryTime: Date().addingTimeInterval(self.retryInterval * Double(message.retryCount + 2))
-                        )
-                        self.retryQueue.append(updatedMessage)
+                        // No peers connected, reschedule with exponential backoff
+                        if message.retryCount < message.maxRetries {
+                            let backoffDelay = self.retryInterval * pow(2.0, Double(message.retryCount))
+                            let updatedMessage = RetryableMessage(
+                                id: message.id,
+                                originalMessageID: message.originalMessageID,
+                                originalTimestamp: message.originalTimestamp,
+                                content: message.content,
+                                mentions: message.mentions,
+                                isPrivate: message.isPrivate,
+                                recipientPeerID: message.recipientPeerID,
+                                recipientNickname: message.recipientNickname,
+                                retryCount: message.retryCount + 1,
+                                nextRetryTime: Date().addingTimeInterval(backoffDelay)
+                            )
+                            self.retryQueue.append(updatedMessage)
+                        }
                     }
                 }
             }

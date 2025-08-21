@@ -23,21 +23,42 @@
 		0F83B8232E54EC9100DCF225 /* RoomsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B81F2E54EC9100DCF225 /* RoomsListView.swift */; };
 		0F83B8282E54ECC300DCF225 /* MchatProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8272E54ECC300DCF225 /* MchatProtocol.swift */; };
 		0F83B8292E54ECC300DCF225 /* MchatProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8272E54ECC300DCF225 /* MchatProtocol.swift */; };
-		0F83B8312E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8302E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift */; };
-		0F83B8322E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8302E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift */; };
-		0F83B8342E54EDD900DCF225 /* RoomMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8332E54EDD900DCF225 /* RoomMessageTests.swift */; };
-		0F83B8352E54EDD900DCF225 /* RoomMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8332E54EDD900DCF225 /* RoomMessageTests.swift */; };
 		0F83B8412E54F4EB00DCF225 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B83F2E54F4EB00DCF225 /* Conversation.swift */; };
 		0F83B8422E54F4EB00DCF225 /* ConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8402E54F4EB00DCF225 /* ConversationStore.swift */; };
 		0F83B8432E54F4EB00DCF225 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B83F2E54F4EB00DCF225 /* Conversation.swift */; };
 		0F83B8442E54F4EB00DCF225 /* ConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8402E54F4EB00DCF225 /* ConversationStore.swift */; };
-		10FF3A16B081337B68C5E370 /* PrivateChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1110F486B1041688197DF95 /* PrivateChatE2ETests.swift */; };
+		0F83B85B2E561E0900DCF225 /* NostrProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8592E561BDB00DCF225 /* NostrProtocolTests.swift */; };
+		0F83B85C2E561E0900DCF225 /* RoomIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84B2E561BDB00DCF225 /* RoomIsolationTests.swift */; };
+		0F83B85D2E561E0900DCF225 /* RoomMessageIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84C2E561BDB00DCF225 /* RoomMessageIntegrationTests.swift */; };
+		0F83B85E2E561E0900DCF225 /* NoiseProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8502E561BDB00DCF225 /* NoiseProtocolTests.swift */; };
+		0F83B85F2E561E0900DCF225 /* PrivateChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8452E561BDB00DCF225 /* PrivateChatE2ETests.swift */; };
+		0F83B8602E561E0900DCF225 /* MockBluetoothMeshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84E2E561BDB00DCF225 /* MockBluetoothMeshService.swift */; };
+		0F83B8612E561E0900DCF225 /* RoomMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8532E561BDB00DCF225 /* RoomMessageTests.swift */; };
+		0F83B8622E561E0900DCF225 /* PublicChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8462E561BDB00DCF225 /* PublicChatE2ETests.swift */; };
+		0F83B8632E561E0900DCF225 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8562E561BDB00DCF225 /* TestHelpers.swift */; };
+		0F83B8642E561E0900DCF225 /* UnifiedProtocolE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8472E561BDB00DCF225 /* UnifiedProtocolE2ETests.swift */; };
+		0F83B8652E561E0900DCF225 /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84A2E561BDB00DCF225 /* IntegrationTests.swift */; };
+		0F83B8662E561E0900DCF225 /* BinaryProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8522E561BDB00DCF225 /* BinaryProtocolTests.swift */; };
+		0F83B8672E561E0900DCF225 /* TestConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8552E561BDB00DCF225 /* TestConstants.swift */; };
+		0F83B8682E561E0900DCF225 /* CampusGateSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8492E561BDB00DCF225 /* CampusGateSecurityTests.swift */; };
+		0F83B8692E561E0900DCF225 /* NostrProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8592E561BDB00DCF225 /* NostrProtocolTests.swift */; };
+		0F83B86A2E561E0900DCF225 /* UnifiedProtocolE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8472E561BDB00DCF225 /* UnifiedProtocolE2ETests.swift */; };
+		0F83B86B2E561E0900DCF225 /* PublicChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8462E561BDB00DCF225 /* PublicChatE2ETests.swift */; };
+		0F83B86C2E561E0900DCF225 /* RoomMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8532E561BDB00DCF225 /* RoomMessageTests.swift */; };
+		0F83B86D2E561E0900DCF225 /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84A2E561BDB00DCF225 /* IntegrationTests.swift */; };
+		0F83B86E2E561E0900DCF225 /* BinaryProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8522E561BDB00DCF225 /* BinaryProtocolTests.swift */; };
+		0F83B86F2E561E0900DCF225 /* TestConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8552E561BDB00DCF225 /* TestConstants.swift */; };
+		0F83B8702E561E0900DCF225 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8562E561BDB00DCF225 /* TestHelpers.swift */; };
+		0F83B8712E561E0900DCF225 /* RoomIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84B2E561BDB00DCF225 /* RoomIsolationTests.swift */; };
+		0F83B8722E561E0900DCF225 /* CampusGateSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8492E561BDB00DCF225 /* CampusGateSecurityTests.swift */; };
+		0F83B8732E561E0900DCF225 /* PrivateChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8452E561BDB00DCF225 /* PrivateChatE2ETests.swift */; };
+		0F83B8742E561E0900DCF225 /* RoomMessageIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84C2E561BDB00DCF225 /* RoomMessageIntegrationTests.swift */; };
+		0F83B8752E561E0900DCF225 /* NoiseProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B8502E561BDB00DCF225 /* NoiseProtocolTests.swift */; };
+		0F83B8762E561E0900DCF225 /* MockBluetoothMeshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F83B84E2E561BDB00DCF225 /* MockBluetoothMeshService.swift */; };
 		13209CB2DBE7E6A23DB4C855 /* NoiseProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078C1C2C025BA13D125EA3F4 /* NoiseProtocol.swift */; };
 		13F32097D6A7F8D0A06C3D35 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BEE1B68AC839AFB3E37C35 /* ContentView.swift */; };
-		14E04C45018A14F4638CE7B0 /* NostrProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E92ACBFC6DE6110B999D8D3 /* NostrProtocolTests.swift */; };
 		15B566036C2700D55E5319FD /* NostrProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF3475B634A6FF4F8A38F0A /* NostrProtocol.swift */; };
 		1693099E788E3ED5EDAA0B39 /* BluetoothMeshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CD108B900C6C938EA0668E /* BluetoothMeshService.swift */; };
-		16A2D7F1587A30C1EE26367C /* PrivateChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1110F486B1041688197DF95 /* PrivateChatE2ETests.swift */; };
 		1A646F4F9A98A863EC0EAA02 /* BinaryEncodingUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7862628AAFCE71DFCC2FA2 /* BinaryEncodingUtils.swift */; };
 		1AC2340B865E56E1848C47EA /* SecureLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56067388BAAB0B7376F77C07 /* SecureLogger.swift */; };
 		1B1ED14182C9DC09DF3B0BD2 /* NoiseHandshakeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB5F045B8F440119A3B567A /* NoiseHandshakeCoordinator.swift */; };
@@ -46,12 +67,9 @@
 		27DA51F55F32C4694F75B845 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580E1E3B86911B64CA97B9AD /* NotificationService.swift */; };
 		27E6870F121A2871122F156C /* AWSCognitoAuthPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 6F1A191E02B4AFD264DE4B0D /* AWSCognitoAuthPlugin */; };
 		285B9FFEF8202B9C55C41420 /* NostrRelayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E2412B6E19DD97B9C92437 /* NostrRelayManager.swift */; };
-		2A0A6481B6A7CD786DB942A4 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484CAABE6FCCF47C951C2448 /* TestHelpers.swift */; };
 		2AAE5293310BEA5BEC8A4136 /* PeerSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D089EA47AFD0A77CD662581 /* PeerSession.swift */; };
 		2D0C76B7CE476A05165F1DFE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F96E02236EEDEEA1B76C5FE /* APIClient.swift */; };
 		346DEAA0D07036B2E159F354 /* BluetoothMeshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CD108B900C6C938EA0668E /* BluetoothMeshService.swift */; };
-		39EFF376C76CB3075250D18B /* NoiseProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D60594C6B195470A1CA75D7 /* NoiseProtocolTests.swift */; };
-		3C92DEA7B18A5641675A84C0 /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D321E11D79C3C476AE3ED715 /* IntegrationTests.swift */; };
 		3E882F5710DFF2527DD7535A /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F44F209120592845F1FD7199 /* AuthService.swift */; };
 		406C01B6A014ADD9F2D018E8 /* PeerSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D089EA47AFD0A77CD662581 /* PeerSession.swift */; };
 		415006577F23B48E082E57DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 91636D76AD4B397B0475065B /* Assets.xcassets */; };
@@ -62,7 +80,6 @@
 		44293B3B1BF4348D8079AB37 /* MembershipCredentialManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E65EEF362B6BEEAAFE81C3AC /* MembershipCredentialManager.swift */; };
 		47263B2A00D862C285CFCF59 /* CampusGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6FCF65F0F1C3EFE6DD16F8A /* CampusGate.swift */; };
 		47A47E6BED2B5EE9289A1B53 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FECC5B16EDA09A9DE270306 /* ShareViewController.swift */; };
-		4898B1F93EC9D2AA080B02C6 /* NostrProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E92ACBFC6DE6110B999D8D3 /* NostrProtocolTests.swift */; };
 		49E4283EEEF640A3E0486CE1 /* AppInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101B6BF4E81CAAEC8DCED2B6 /* AppInfoView.swift */; };
 		507AB308D1780F0763308E52 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 91636D76AD4B397B0475065B /* Assets.xcassets */; };
 		52526346F34473B1F9EB6EEB /* CompressionUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC913C5C82EF6FAA0526CA6 /* CompressionUtil.swift */; };
@@ -73,18 +90,13 @@
 		580E1F378F2780E71AB31035 /* MembershipCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48E90C137CC40A8DF86D80B1 /* MembershipCredential.swift */; };
 		58DF2382476A5EF07979117B /* NostrProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF3475B634A6FF4F8A38F0A /* NostrProtocol.swift */; };
 		5D81F5E2329809E4B90622AA /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 709747B5E7B9F886DB621232 /* LRUCache.swift */; };
-		5DAA61EB528539C2D0C1133B /* MockBluetoothMeshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7EA4FE7297DCBDBAA0E065E /* MockBluetoothMeshService.swift */; };
 		5EFCA9FFB39E5F39AD4DB23B /* BatteryOptimizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3833A9CC949B8E86D8493123 /* BatteryOptimizer.swift */; };
 		6097CA959B499532110AEFCC /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7EFD5F5FD0562BF66A3D025 /* Config.swift */; };
-		63FFFF0AF2B1E83B2A9CD255 /* PublicChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4F5280CACE72B8D35AEE38 /* PublicChatE2ETests.swift */; };
 		64CF7029DCDEA60B2F8B186A /* MembershipCredentialManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E65EEF362B6BEEAAFE81C3AC /* MembershipCredentialManager.swift */; };
 		67748142E13E9778CC0E1265 /* SecureLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56067388BAAB0B7376F77C07 /* SecureLogger.swift */; };
-		69EBE3EDB8F234BF111069B7 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484CAABE6FCCF47C951C2448 /* TestHelpers.swift */; };
 		6FCA915C3D371D3892753278 /* AmplifySetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C32EAE967C0E40AB6DBDB0A /* AmplifySetup.swift */; };
-		72B88A3028414376217224DB /* BinaryProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2081AB4E049A55A212850E43 /* BinaryProtocolTests.swift */; };
 		782651E897C3799FB4909C29 /* MembershipCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48E90C137CC40A8DF86D80B1 /* MembershipCredential.swift */; };
 		79FA286C3A2877E56727645A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 036A7709CD0A6DAB9F0B4290 /* LaunchScreen.storyboard */; };
-		7D9B3F604B90E0CDF4DED586 /* NoiseProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D60594C6B195470A1CA75D7 /* NoiseProtocolTests.swift */; };
 		7F42577DB4105F86845BD01E /* Amplify in Frameworks */ = {isa = PBXBuildFile; productRef = D1666B8ECACDDF728DA8A893 /* Amplify */; };
 		7FFDBF6B0B8FB217316BBFDB /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8EB03A180307CE3289A0D54 /* AuthView.swift */; };
 		8212F56A52BFA191256CD4E6 /* SecureIdentityStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BD11E3CCEF63ABC36D3034 /* SecureIdentityStateManager.swift */; };
@@ -92,7 +104,6 @@
 		8F48298E4F8769CB7A59A917 /* BinaryEncodingUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7862628AAFCE71DFCC2FA2 /* BinaryEncodingUtils.swift */; };
 		938295B31903D372FCB73996 /* ProcessedMessagesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACF5DE37321CBB5DF670C81 /* ProcessedMessagesService.swift */; };
 		96B3A71E68757CC97CCB2B05 /* AppInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101B6BF4E81CAAEC8DCED2B6 /* AppInfoView.swift */; };
-		9805A0BCB117BD0C923F7400 /* MockBluetoothMeshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7EA4FE7297DCBDBAA0E065E /* MockBluetoothMeshService.swift */; };
 		983B99E66D3A6A84CA2233B6 /* MessageRetryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A0249FFC6EC3BC721623C4 /* MessageRetryService.swift */; };
 		98C0A92351DB9AF32AA13D46 /* BitchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6998331A2B32D5D14DC03BA5 /* BitchatApp.swift */; };
 		9AFC50D6AF04149AF704CD3A /* FingerprintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD41E3A092DBBE4D8263A5B /* FingerprintView.swift */; };
@@ -100,7 +111,6 @@
 		9C251293AD978D83AEFBB87E /* SecureIdentityStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BD11E3CCEF63ABC36D3034 /* SecureIdentityStateManager.swift */; };
 		9E1CF6085C766E1F3F5ADFB2 /* NoiseEncryptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A2A38A8E5019F8E283DC82A /* NoiseEncryptionService.swift */; };
 		9FD51CD3AB38A3A6B03F2D48 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 175181DF062BC623643F7C75 /* AuthManager.swift */; };
-		A202EE9F8D32553C66BC2A3A /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D321E11D79C3C476AE3ED715 /* IntegrationTests.swift */; };
 		A2E4C5C3AAC2D25B4DB2D0BB /* BitchatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6998331A2B32D5D14DC03BA5 /* BitchatApp.swift */; };
 		A3D962B97473B36F19F88EDD /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09936958DCCCFC54ACD816F1 /* KeychainManager.swift */; };
 		A4A4114FF419CA20EFF6147A /* BinaryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E7D64DB2094A7EF7FFEBA6 /* BinaryProtocol.swift */; };
@@ -108,15 +118,12 @@
 		A8BDF07199D25CBAF37B43C6 /* NoiseSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222F05DEF3ADD379FC99854D /* NoiseSession.swift */; };
 		AF2DAEB28BDDB3A2B986A6D8 /* FavoritesPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBB901D7123F43833F8D79BF /* FavoritesPersistenceService.swift */; };
 		B03F597B7107BE4D248F5B37 /* MessageRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A53D4F04A52B5DDC5479223 /* MessageRouter.swift */; };
-		B0EB2B771CB99317006F7CA6 /* PublicChatE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4F5280CACE72B8D35AEE38 /* PublicChatE2ETests.swift */; };
 		B30E10BC5DF914FA4A6E0C3E /* BitchatPeer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8208D7889F5C99CADC7A33 /* BitchatPeer.swift */; };
 		B3D08F7749F56F87495E646A /* BitchatProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CD3C07AF4F548472AB5CAA /* BitchatProtocol.swift */; };
 		B4EAEA133B9C626A8E7C83D3 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580E1E3B86911B64CA97B9AD /* NotificationService.swift */; };
 		B6B3AECB0E0382D0C4945D65 /* DeliveryTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED4DAC47D564996E2BFD78F /* DeliveryTracker.swift */; };
-		BC0CA6EEF84918374CA29393 /* TestConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D599369A97BE5ECD625A11 /* TestConstants.swift */; };
 		BCA986EFABF606BAFDCDC19B /* BitchatProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CD3C07AF4F548472AB5CAA /* BitchatProtocol.swift */; };
 		BEB867D9D8BAA3A1C98D86DA /* NoiseSecurityConsiderations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 030B74D7B02F72F0892E6EFE /* NoiseSecurityConsiderations.swift */; };
-		BED71AB2230EF5949320AC58 /* BinaryProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2081AB4E049A55A212850E43 /* BinaryProtocolTests.swift */; };
 		C3306EB724CF08FCF3038A62 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81D4128040598E6C6D985B8 /* ChatViewModel.swift */; };
 		C5D061A43B5640CFF0B895FF /* TopicManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750E34CE6875E043E32D28F7 /* TopicManager.swift */; };
 		C6DF8CB70E588DD7006E7F8F /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09936958DCCCFC54ACD816F1 /* KeychainManager.swift */; };
@@ -142,7 +149,6 @@
 		F5F26C19D78B184274C870DF /* NoiseSecurityConsiderations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 030B74D7B02F72F0892E6EFE /* NoiseSecurityConsiderations.swift */; };
 		F65B4364CFA96F508CB9A56A /* P256K in Frameworks */ = {isa = PBXBuildFile; productRef = 6E36750D59FEEF777086E17B /* P256K */; };
 		FCDFA9E75A86A52C30F30125 /* CompressionUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC913C5C82EF6FAA0526CA6 /* CompressionUtil.swift */; };
-		FECD9705CE197CB5AFE1BA36 /* TestConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D599369A97BE5ECD625A11 /* TestConstants.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -189,29 +195,39 @@
 		036A7709CD0A6DAB9F0B4290 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		078C1C2C025BA13D125EA3F4 /* NoiseProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseProtocol.swift; sourceTree = "<group>"; };
 		09936958DCCCFC54ACD816F1 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
-		0DB51DE3FE74217596EFD946 /* chatM_macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = chatM_macOS.app; path = chatM.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0DB51DE3FE74217596EFD946 /* chatM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = chatM.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0F83B81B2E51A58900DCF225 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		0F83B81E2E54EC9100DCF225 /* RoomChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomChatView.swift; sourceTree = "<group>"; };
 		0F83B81F2E54EC9100DCF225 /* RoomsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomsListView.swift; sourceTree = "<group>"; };
 		0F83B8272E54ECC300DCF225 /* MchatProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MchatProtocol.swift; sourceTree = "<group>"; };
-		0F83B8302E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMessageIntegrationTests.swift; sourceTree = "<group>"; };
-		0F83B8332E54EDD900DCF225 /* RoomMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMessageTests.swift; sourceTree = "<group>"; };
 		0F83B83F2E54F4EB00DCF225 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		0F83B8402E54F4EB00DCF225 /* ConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationStore.swift; sourceTree = "<group>"; };
+		0F83B8452E561BDB00DCF225 /* PrivateChatE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateChatE2ETests.swift; sourceTree = "<group>"; };
+		0F83B8462E561BDB00DCF225 /* PublicChatE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicChatE2ETests.swift; sourceTree = "<group>"; };
+		0F83B8472E561BDB00DCF225 /* UnifiedProtocolE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedProtocolE2ETests.swift; sourceTree = "<group>"; };
+		0F83B8492E561BDB00DCF225 /* CampusGateSecurityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampusGateSecurityTests.swift; sourceTree = "<group>"; };
+		0F83B84A2E561BDB00DCF225 /* IntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationTests.swift; sourceTree = "<group>"; };
+		0F83B84B2E561BDB00DCF225 /* RoomIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomIsolationTests.swift; sourceTree = "<group>"; };
+		0F83B84C2E561BDB00DCF225 /* RoomMessageIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMessageIntegrationTests.swift; sourceTree = "<group>"; };
+		0F83B84E2E561BDB00DCF225 /* MockBluetoothMeshService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockBluetoothMeshService.swift; sourceTree = "<group>"; };
+		0F83B8502E561BDB00DCF225 /* NoiseProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseProtocolTests.swift; sourceTree = "<group>"; };
+		0F83B8522E561BDB00DCF225 /* BinaryProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryProtocolTests.swift; sourceTree = "<group>"; };
+		0F83B8532E561BDB00DCF225 /* RoomMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMessageTests.swift; sourceTree = "<group>"; };
+		0F83B8552E561BDB00DCF225 /* TestConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestConstants.swift; sourceTree = "<group>"; };
+		0F83B8562E561BDB00DCF225 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
+		0F83B8582E561BDB00DCF225 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		0F83B8592E561BDB00DCF225 /* NostrProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrProtocolTests.swift; sourceTree = "<group>"; };
 		101B6BF4E81CAAEC8DCED2B6 /* AppInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfoView.swift; sourceTree = "<group>"; };
 		174D8FB071048F0C4BC654E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		175181DF062BC623643F7C75 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		1A53D4F04A52B5DDC5479223 /* MessageRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRouter.swift; sourceTree = "<group>"; };
-		1B4F5280CACE72B8D35AEE38 /* PublicChatE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicChatE2ETests.swift; sourceTree = "<group>"; };
 		1BC913C5C82EF6FAA0526CA6 /* CompressionUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompressionUtil.swift; sourceTree = "<group>"; };
-		2081AB4E049A55A212850E43 /* BinaryProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryProtocolTests.swift; sourceTree = "<group>"; };
 		222F05DEF3ADD379FC99854D /* NoiseSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseSession.swift; sourceTree = "<group>"; };
 		2F96E02236EEDEEA1B76C5FE /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		2FB5F045B8F440119A3B567A /* NoiseHandshakeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseHandshakeCoordinator.swift; sourceTree = "<group>"; };
 		2FF3475B634A6FF4F8A38F0A /* NostrProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrProtocol.swift; sourceTree = "<group>"; };
 		3833A9CC949B8E86D8493123 /* BatteryOptimizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryOptimizer.swift; sourceTree = "<group>"; };
 		40BD11E3CCEF63ABC36D3034 /* SecureIdentityStateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureIdentityStateManager.swift; sourceTree = "<group>"; };
-		484CAABE6FCCF47C951C2448 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		48E90C137CC40A8DF86D80B1 /* MembershipCredential.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipCredential.swift; sourceTree = "<group>"; };
 		51E40C1C10FFE90B9347C452 /* chatMShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = chatMShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		56067388BAAB0B7376F77C07 /* SecureLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureLogger.swift; sourceTree = "<group>"; };
@@ -221,20 +237,16 @@
 		6D089EA47AFD0A77CD662581 /* PeerSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerSession.swift; sourceTree = "<group>"; };
 		709747B5E7B9F886DB621232 /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
 		732B85CF93F2602CF2BD9B5D /* chatM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = chatM.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		749A0E7C98F77734798C803A /* chatMTests_iOS.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = chatMTests_iOS.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		749A0E7C98F77734798C803A /* chatMTests_iOS.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = chatMTests_iOS.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		750E34CE6875E043E32D28F7 /* TopicManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopicManager.swift; sourceTree = "<group>"; };
-		7D60594C6B195470A1CA75D7 /* NoiseProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseProtocolTests.swift; sourceTree = "<group>"; };
 		7FECC5B16EDA09A9DE270306 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		86AA5E88BC172A4AE888F287 /* bitchat.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = bitchat.entitlements; sourceTree = "<group>"; };
-		8775B8F2F4E89C8158F1EBB7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		88CD108B900C6C938EA0668E /* BluetoothMeshService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothMeshService.swift; sourceTree = "<group>"; };
 		8A2A38A8E5019F8E283DC82A /* NoiseEncryptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseEncryptionService.swift; sourceTree = "<group>"; };
 		8ACF5DE37321CBB5DF670C81 /* ProcessedMessagesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessedMessagesService.swift; sourceTree = "<group>"; };
 		8CD41E3A092DBBE4D8263A5B /* FingerprintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FingerprintView.swift; sourceTree = "<group>"; };
-		8E92ACBFC6DE6110B999D8D3 /* NostrProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrProtocolTests.swift; sourceTree = "<group>"; };
 		91636D76AD4B397B0475065B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		93E7D64DB2094A7EF7FFEBA6 /* BinaryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryProtocol.swift; sourceTree = "<group>"; };
-		97D599369A97BE5ECD625A11 /* TestConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestConstants.swift; sourceTree = "<group>"; };
 		9C32EAE967C0E40AB6DBDB0A /* AmplifySetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmplifySetup.swift; sourceTree = "<group>"; };
 		9E7862628AAFCE71DFCC2FA2 /* BinaryEncodingUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinaryEncodingUtils.swift; sourceTree = "<group>"; };
 		9ED4DAC47D564996E2BFD78F /* DeliveryTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryTracker.swift; sourceTree = "<group>"; };
@@ -246,15 +258,12 @@
 		B4A0249FFC6EC3BC721623C4 /* MessageRetryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRetryService.swift; sourceTree = "<group>"; };
 		B74A471C0CB67C358A70EB8E /* OptimizedBloomFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptimizedBloomFilter.swift; sourceTree = "<group>"; };
 		B7D7E6163AA5009A62E3C750 /* InputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputValidator.swift; sourceTree = "<group>"; };
-		B7EA4FE7297DCBDBAA0E065E /* MockBluetoothMeshService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockBluetoothMeshService.swift; sourceTree = "<group>"; };
 		B81D4128040598E6C6D985B8 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		B8EB03A180307CE3289A0D54 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		C4816B245EF566F00DF55724 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CBB901D7123F43833F8D79BF /* FavoritesPersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesPersistenceService.swift; sourceTree = "<group>"; };
 		D0AF748EE057117FC0166F5C /* LinkPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkPreviewView.swift; sourceTree = "<group>"; };
-		D321E11D79C3C476AE3ED715 /* IntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationTests.swift; sourceTree = "<group>"; };
 		D7EFD5F5FD0562BF66A3D025 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
-		E1110F486B1041688197DF95 /* PrivateChatE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateChatE2ETests.swift; sourceTree = "<group>"; };
 		E3B3F139613D128F943DF245 /* NostrIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NostrIdentity.swift; sourceTree = "<group>"; };
 		E65EEF362B6BEEAAFE81C3AC /* MembershipCredentialManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipCredentialManager.swift; sourceTree = "<group>"; };
 		F44F209120592845F1FD7199 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
@@ -286,6 +295,76 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0F83B8482E561BDB00DCF225 /* EndToEnd */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B8452E561BDB00DCF225 /* PrivateChatE2ETests.swift */,
+				0F83B8462E561BDB00DCF225 /* PublicChatE2ETests.swift */,
+				0F83B8472E561BDB00DCF225 /* UnifiedProtocolE2ETests.swift */,
+			);
+			path = EndToEnd;
+			sourceTree = "<group>";
+		};
+		0F83B84D2E561BDB00DCF225 /* Integration */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B8492E561BDB00DCF225 /* CampusGateSecurityTests.swift */,
+				0F83B84A2E561BDB00DCF225 /* IntegrationTests.swift */,
+				0F83B84B2E561BDB00DCF225 /* RoomIsolationTests.swift */,
+				0F83B84C2E561BDB00DCF225 /* RoomMessageIntegrationTests.swift */,
+			);
+			path = Integration;
+			sourceTree = "<group>";
+		};
+		0F83B84F2E561BDB00DCF225 /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B84E2E561BDB00DCF225 /* MockBluetoothMeshService.swift */,
+			);
+			path = Mocks;
+			sourceTree = "<group>";
+		};
+		0F83B8512E561BDB00DCF225 /* Noise */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B8502E561BDB00DCF225 /* NoiseProtocolTests.swift */,
+			);
+			path = Noise;
+			sourceTree = "<group>";
+		};
+		0F83B8542E561BDB00DCF225 /* Protocol */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B8522E561BDB00DCF225 /* BinaryProtocolTests.swift */,
+				0F83B8532E561BDB00DCF225 /* RoomMessageTests.swift */,
+			);
+			path = Protocol;
+			sourceTree = "<group>";
+		};
+		0F83B8572E561BDB00DCF225 /* TestUtilities */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B8552E561BDB00DCF225 /* TestConstants.swift */,
+				0F83B8562E561BDB00DCF225 /* TestHelpers.swift */,
+			);
+			path = TestUtilities;
+			sourceTree = "<group>";
+		};
+		0F83B85A2E561BDB00DCF225 /* MchatTests */ = {
+			isa = PBXGroup;
+			children = (
+				0F83B8482E561BDB00DCF225 /* EndToEnd */,
+				0F83B84D2E561BDB00DCF225 /* Integration */,
+				0F83B84F2E561BDB00DCF225 /* Mocks */,
+				0F83B8512E561BDB00DCF225 /* Noise */,
+				0F83B8542E561BDB00DCF225 /* Protocol */,
+				0F83B8572E561BDB00DCF225 /* TestUtilities */,
+				0F83B8582E561BDB00DCF225 /* Info.plist */,
+				0F83B8592E561BDB00DCF225 /* NostrProtocolTests.swift */,
+			);
+			path = MchatTests;
+			sourceTree = "<group>";
+		};
 		15D37CC77366FF72DADA72A5 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -301,30 +380,6 @@
 				40BD11E3CCEF63ABC36D3034 /* SecureIdentityStateManager.swift */,
 			);
 			path = Identity;
-			sourceTree = "<group>";
-		};
-		1BB4FACFC3124680BCA0DB34 /* bitchatTests */ = {
-			isa = PBXGroup;
-			children = (
-				8775B8F2F4E89C8158F1EBB7 /* Info.plist */,
-				8E92ACBFC6DE6110B999D8D3 /* NostrProtocolTests.swift */,
-				D49601FC2B2396D261FAD088 /* EndToEnd */,
-				8CF2730817DF3CAA0FB66AE1 /* Integration */,
-				8F39CF04D4BC11DA0DFC97FD /* Mocks */,
-				6573896EFEB3380077BB3D29 /* Noise */,
-				1E4B0066BF4CFBED4C4563C6 /* Protocol */,
-				2A99AA74986BF1688233051D /* TestUtilities */,
-			);
-			path = bitchatTests;
-			sourceTree = "<group>";
-		};
-		1E4B0066BF4CFBED4C4563C6 /* Protocol */ = {
-			isa = PBXGroup;
-			children = (
-				0F83B8332E54EDD900DCF225 /* RoomMessageTests.swift */,
-				2081AB4E049A55A212850E43 /* BinaryProtocolTests.swift */,
-			);
-			path = Protocol;
 			sourceTree = "<group>";
 		};
 		253229BC546B2FC95A3784FB /* Nostr */ = {
@@ -345,15 +400,6 @@
 				D7EFD5F5FD0562BF66A3D025 /* Config.swift */,
 			);
 			path = Auth;
-			sourceTree = "<group>";
-		};
-		2A99AA74986BF1688233051D /* TestUtilities */ = {
-			isa = PBXGroup;
-			children = (
-				97D599369A97BE5ECD625A11 /* TestConstants.swift */,
-				484CAABE6FCCF47C951C2448 /* TestHelpers.swift */,
-			);
-			path = TestUtilities;
 			sourceTree = "<group>";
 		};
 		2D2CA7AAF74EA7529AA1CF30 /* Utils */ = {
@@ -404,19 +450,11 @@
 			path = Net;
 			sourceTree = "<group>";
 		};
-		6573896EFEB3380077BB3D29 /* Noise */ = {
-			isa = PBXGroup;
-			children = (
-				7D60594C6B195470A1CA75D7 /* NoiseProtocolTests.swift */,
-			);
-			path = Noise;
-			sourceTree = "<group>";
-		};
 		6B0315A6D2894BB40877B4A7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				732B85CF93F2602CF2BD9B5D /* chatM.app */,
-				0DB51DE3FE74217596EFD946 /* chatM_macOS.app */,
+				0DB51DE3FE74217596EFD946 /* chatM.app */,
 				51E40C1C10FFE90B9347C452 /* chatMShareExtension.appex */,
 				749A0E7C98F77734798C803A /* chatMTests_iOS.xctest */,
 				AE379F80ED9769BA384E5DDF /* chatMTests_macOS.xctest */,
@@ -438,9 +476,9 @@
 		6ED49C309B47820FEE05D9C1 = {
 			isa = PBXGroup;
 			children = (
+				0F83B85A2E561BDB00DCF225 /* MchatTests */,
 				789E59E02955DA683805584A /* bitchat */,
 				87E8C32488E5DF4248AF9E58 /* bitchatShareExtension */,
-				1BB4FACFC3124680BCA0DB34 /* bitchatTests */,
 				36D597D8423726F4E50EBE26 /* ChatM */,
 				6B0315A6D2894BB40877B4A7 /* Products */,
 			);
@@ -478,23 +516,6 @@
 			path = bitchatShareExtension;
 			sourceTree = "<group>";
 		};
-		8CF2730817DF3CAA0FB66AE1 /* Integration */ = {
-			isa = PBXGroup;
-			children = (
-				0F83B8302E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift */,
-				D321E11D79C3C476AE3ED715 /* IntegrationTests.swift */,
-			);
-			path = Integration;
-			sourceTree = "<group>";
-		};
-		8F39CF04D4BC11DA0DFC97FD /* Mocks */ = {
-			isa = PBXGroup;
-			children = (
-				B7EA4FE7297DCBDBAA0E065E /* MockBluetoothMeshService.swift */,
-			);
-			path = Mocks;
-			sourceTree = "<group>";
-		};
 		B05AA28BB08F8571914B5CBF /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -502,15 +523,6 @@
 				6D089EA47AFD0A77CD662581 /* PeerSession.swift */,
 			);
 			path = Models;
-			sourceTree = "<group>";
-		};
-		D49601FC2B2396D261FAD088 /* EndToEnd */ = {
-			isa = PBXGroup;
-			children = (
-				E1110F486B1041688197DF95 /* PrivateChatE2ETests.swift */,
-				1B4F5280CACE72B8D35AEE38 /* PublicChatE2ETests.swift */,
-			);
-			path = EndToEnd;
 			sourceTree = "<group>";
 		};
 		DC118ED7AC0A1B6C867D383C /* Membership */ = {
@@ -651,7 +663,7 @@
 				6F1A191E02B4AFD264DE4B0D /* AWSCognitoAuthPlugin */,
 			);
 			productName = chatM_macOS;
-			productReference = 0DB51DE3FE74217596EFD946 /* chatM_macOS.app */;
+			productReference = 0DB51DE3FE74217596EFD946 /* chatM.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -743,17 +755,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0F83B8342E54EDD900DCF225 /* RoomMessageTests.swift in Sources */,
-				72B88A3028414376217224DB /* BinaryProtocolTests.swift in Sources */,
-				3C92DEA7B18A5641675A84C0 /* IntegrationTests.swift in Sources */,
-				9805A0BCB117BD0C923F7400 /* MockBluetoothMeshService.swift in Sources */,
-				39EFF376C76CB3075250D18B /* NoiseProtocolTests.swift in Sources */,
-				0F83B8312E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift in Sources */,
-				14E04C45018A14F4638CE7B0 /* NostrProtocolTests.swift in Sources */,
-				16A2D7F1587A30C1EE26367C /* PrivateChatE2ETests.swift in Sources */,
-				B0EB2B771CB99317006F7CA6 /* PublicChatE2ETests.swift in Sources */,
-				FECD9705CE197CB5AFE1BA36 /* TestConstants.swift in Sources */,
-				69EBE3EDB8F234BF111069B7 /* TestHelpers.swift in Sources */,
+				0F83B85B2E561E0900DCF225 /* NostrProtocolTests.swift in Sources */,
+				0F83B85C2E561E0900DCF225 /* RoomIsolationTests.swift in Sources */,
+				0F83B85D2E561E0900DCF225 /* RoomMessageIntegrationTests.swift in Sources */,
+				0F83B85E2E561E0900DCF225 /* NoiseProtocolTests.swift in Sources */,
+				0F83B85F2E561E0900DCF225 /* PrivateChatE2ETests.swift in Sources */,
+				0F83B8602E561E0900DCF225 /* MockBluetoothMeshService.swift in Sources */,
+				0F83B8612E561E0900DCF225 /* RoomMessageTests.swift in Sources */,
+				0F83B8622E561E0900DCF225 /* PublicChatE2ETests.swift in Sources */,
+				0F83B8632E561E0900DCF225 /* TestHelpers.swift in Sources */,
+				0F83B8642E561E0900DCF225 /* UnifiedProtocolE2ETests.swift in Sources */,
+				0F83B8652E561E0900DCF225 /* IntegrationTests.swift in Sources */,
+				0F83B8662E561E0900DCF225 /* BinaryProtocolTests.swift in Sources */,
+				0F83B8672E561E0900DCF225 /* TestConstants.swift in Sources */,
+				0F83B8682E561E0900DCF225 /* CampusGateSecurityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -877,17 +892,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0F83B8352E54EDD900DCF225 /* RoomMessageTests.swift in Sources */,
-				BED71AB2230EF5949320AC58 /* BinaryProtocolTests.swift in Sources */,
-				A202EE9F8D32553C66BC2A3A /* IntegrationTests.swift in Sources */,
-				5DAA61EB528539C2D0C1133B /* MockBluetoothMeshService.swift in Sources */,
-				7D9B3F604B90E0CDF4DED586 /* NoiseProtocolTests.swift in Sources */,
-				0F83B8322E54ED0F00DCF225 /* RoomMessageIntegrationTests.swift in Sources */,
-				4898B1F93EC9D2AA080B02C6 /* NostrProtocolTests.swift in Sources */,
-				10FF3A16B081337B68C5E370 /* PrivateChatE2ETests.swift in Sources */,
-				63FFFF0AF2B1E83B2A9CD255 /* PublicChatE2ETests.swift in Sources */,
-				BC0CA6EEF84918374CA29393 /* TestConstants.swift in Sources */,
-				2A0A6481B6A7CD786DB942A4 /* TestHelpers.swift in Sources */,
+				0F83B8692E561E0900DCF225 /* NostrProtocolTests.swift in Sources */,
+				0F83B86A2E561E0900DCF225 /* UnifiedProtocolE2ETests.swift in Sources */,
+				0F83B86B2E561E0900DCF225 /* PublicChatE2ETests.swift in Sources */,
+				0F83B86C2E561E0900DCF225 /* RoomMessageTests.swift in Sources */,
+				0F83B86D2E561E0900DCF225 /* IntegrationTests.swift in Sources */,
+				0F83B86E2E561E0900DCF225 /* BinaryProtocolTests.swift in Sources */,
+				0F83B86F2E561E0900DCF225 /* TestConstants.swift in Sources */,
+				0F83B8702E561E0900DCF225 /* TestHelpers.swift in Sources */,
+				0F83B8712E561E0900DCF225 /* RoomIsolationTests.swift in Sources */,
+				0F83B8722E561E0900DCF225 /* CampusGateSecurityTests.swift in Sources */,
+				0F83B8732E561E0900DCF225 /* PrivateChatE2ETests.swift in Sources */,
+				0F83B8742E561E0900DCF225 /* RoomMessageIntegrationTests.swift in Sources */,
+				0F83B8752E561E0900DCF225 /* NoiseProtocolTests.swift in Sources */,
+				0F83B8762E561E0900DCF225 /* MockBluetoothMeshService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -945,7 +963,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = L3N5LHJD5Y;
-				INFOPLIST_FILE = bitchatTests/Info.plist;
+				INFOPLIST_FILE = MchatTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -995,7 +1013,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = L3N5LHJD5Y;
-				INFOPLIST_FILE = bitchatTests/Info.plist;
+				INFOPLIST_FILE = MchatTests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1019,7 +1037,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = L3N5LHJD5Y;
-				INFOPLIST_FILE = bitchatTests/Info.plist;
+				INFOPLIST_FILE = MchatTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1042,7 +1060,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = L3N5LHJD5Y;
-				INFOPLIST_FILE = bitchatTests/Info.plist;
+				INFOPLIST_FILE = MchatTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

@@ -1,6 +1,6 @@
 //
 // MockBluetoothMeshService.swift
-// bitchatTests
+// MchatTests       
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -10,11 +10,11 @@ import Foundation
 import MultipeerConnectivity
 @testable import chatM
 
-class MockBluetoothMeshService: BluetoothMeshService {
-    var sentMessages: [(message: BitchatMessage, packet: BitchatPacket)] = []
+class MockBluetoothMeshService: BluetoothMeshService, ConnectivityProvider {
+    var sentMessages: [(message: MchatMessage, packet: BitchatPacket)] = []
     var sentPackets: [BitchatPacket] = []
     var connectedPeers: Set<String> = []
-    var messageDeliveryHandler: ((BitchatMessage) -> Void)?
+    var messageDeliveryHandler: ((MchatMessage) -> Void)?
     var packetDeliveryHandler: ((BitchatPacket) -> Void)?
     var roomMessageDeliveryHandler: ((RoomMessage) -> Void)?
     
@@ -94,7 +94,11 @@ class MockBluetoothMeshService: BluetoothMeshService {
     }
     
     override func sendMessage(_ content: String, mentions: [String], to room: String? = nil, messageID: String? = nil, timestamp: Date? = nil) {
-        let message = BitchatMessage(
+        // Use unified message format with broadcast conversation ID
+        let campusId = self.campusId ?? "test.campus.edu"
+        let broadcastConversationId = TopicManager.broadcastId(campusId: campusId)
+        
+        let message = MchatMessage(
             id: messageID ?? UUID().uuidString,
             sender: mockNickname,
             content: content,
@@ -104,7 +108,9 @@ class MockBluetoothMeshService: BluetoothMeshService {
             isPrivate: false,
             recipientNickname: nil,
             senderPeerID: myPeerID,
-            mentions: mentions.isEmpty ? nil : mentions
+            mentions: mentions.isEmpty ? nil : mentions,
+            deliveryStatus: .sending,
+            conversationId: broadcastConversationId
         )
         
         if let payload = message.toBinaryPayload() {
@@ -132,7 +138,11 @@ class MockBluetoothMeshService: BluetoothMeshService {
     }
     
     override func sendPrivateMessage(_ content: String, to recipientPeerID: String, recipientNickname: String, messageID: String? = nil) {
-        let message = BitchatMessage(
+        // For private messages, use DM conversation ID
+        let campusId = self.campusId ?? "test.campus.edu"
+        let dmConversationId = TopicManager.dmId(peerA: myPeerID, peerB: recipientPeerID, campusId: campusId)
+        
+        let message = MchatMessage(
             id: messageID ?? UUID().uuidString,
             sender: mockNickname,
             content: content,
@@ -142,7 +152,9 @@ class MockBluetoothMeshService: BluetoothMeshService {
             isPrivate: true,
             recipientNickname: recipientNickname,
             senderPeerID: myPeerID,
-            mentions: nil
+            mentions: nil,
+            deliveryStatus: .sending,
+            conversationId: dmConversationId
         )
         
         if let payload = message.toBinaryPayload() {
@@ -159,17 +171,25 @@ class MockBluetoothMeshService: BluetoothMeshService {
             sentMessages.append((message, packet))
             sentPackets.append(packet)
             
-            // Simulate local echo
-            DispatchQueue.main.async { [weak self] in
-                self?.delegate?.didReceiveMessage(message)
+            // Simulate local echo synchronously for deterministic tests
+            self.delegate?.didReceiveMessage(message)
+            // Also expose send attempts to tests that observe this callback
+            self.messageDeliveryHandler?(message)
+
+            // Allow tests to intercept the outgoing packet on the sender (synchronously)
+            self.packetDeliveryHandler?(packet)
+
+            // Deliver as a packet to the recipient so their packetDeliveryHandler can relay/ACK
+            MockBluetoothMeshService.registryQueue.sync {
+                if let recipientService = MockBluetoothMeshService.serviceRegistry[recipientPeerID],
+                   self.connectedPeers.contains(recipientPeerID) {
+                    recipientService.simulateIncomingPacket(packet)
+                }
             }
-            
-            // Deliver private message to specific recipient
-            deliverPrivateMessageToRecipient(message, recipientPeerID: recipientPeerID)
         }
     }
     
-    func simulateIncomingMessage(_ message: BitchatMessage) {
+    func simulateIncomingMessage(_ message: MchatMessage) {
         delegate?.didReceiveMessage(message)
     }
     
@@ -198,15 +218,14 @@ class MockBluetoothMeshService: BluetoothMeshService {
                     }
                     
                     if shouldDeliver {
-                        DispatchQueue.main.async {
-                            self.roomMessageDeliveryHandler?(roomMessage)
-                        }
+                        // Deliver synchronously for deterministic tests
+                        self.roomMessageDeliveryHandler?(roomMessage)
                     }
                 }
             }
         } else {
-            // Handle regular message
-            if let message = BitchatMessage.fromBinaryPayload(packet.payload) {
+            // Handle legacy message packets (0x04) - normalize to unified format
+            if let message = MchatMessage.fromBinaryPayload(packet.payload) {
                 // Check for duplicate
                 let messageKey = "\(message.id)-\(self.myPeerID)"
                 let shouldDeliver = seenMessagesQueue.sync(flags: .barrier) {
@@ -219,18 +238,55 @@ class MockBluetoothMeshService: BluetoothMeshService {
                 }
                 
                 if shouldDeliver {
-                    DispatchQueue.main.async {
-                        self.delegate?.didReceiveMessage(message)
-                        self.messageDeliveryHandler?(message)
+                    // Convert legacy to unified format with proper conversationId
+                    let campusId = self.campusId ?? "test.campus.edu"
+                    let unifiedMessage: MchatMessage
+                    
+                    if message.isPrivate {
+                        // Private message - use DM conversation ID
+                        let dmConversationId = TopicManager.dmId(peerA: message.senderPeerID ?? "", peerB: self.myPeerID, campusId: campusId)
+                        unifiedMessage = MchatMessage(
+                            id: message.id,
+                            sender: message.sender,
+                            content: message.content,
+                            timestamp: message.timestamp,
+                            isRelay: message.isRelay,
+                            originalSender: message.originalSender,
+                            isPrivate: true,
+                            recipientNickname: message.recipientNickname,
+                            senderPeerID: message.senderPeerID,
+                            mentions: message.mentions,
+                            deliveryStatus: message.deliveryStatus,
+                            conversationId: dmConversationId
+                        )
+                    } else {
+                        // Broadcast message - use broadcast conversation ID
+                        let broadcastId = TopicManager.broadcastId(campusId: campusId)
+                        unifiedMessage = MchatMessage(
+                            id: message.id,
+                            sender: message.sender,
+                            content: message.content,
+                            timestamp: message.timestamp,
+                            isRelay: message.isRelay,
+                            originalSender: message.originalSender,
+                            isPrivate: false,
+                            recipientNickname: message.recipientNickname,
+                            senderPeerID: message.senderPeerID,
+                            mentions: message.mentions,
+                            deliveryStatus: message.deliveryStatus,
+                            conversationId: broadcastId
+                        )
                     }
+                    
+                    // Deliver unified message only
+                    self.delegate?.didReceiveMessage(unifiedMessage)
+                    self.messageDeliveryHandler?(unifiedMessage)
                 }
             }
         }
         
         // Trigger packet handler for relay logic
-        DispatchQueue.main.async {
-            self.packetDeliveryHandler?(packet)
-        }
+        self.packetDeliveryHandler?(packet)
         
         // Implement automatic relay if no explicit relay handler is set
         if packetDeliveryHandler == nil {
@@ -242,8 +298,14 @@ class MockBluetoothMeshService: BluetoothMeshService {
         }
     }
     
-    func getConnectedPeers() -> [String] {
+    // ConnectivityProvider implementation
+    var connectedPeerIDs: [String] {
         return Array(connectedPeers)
+    }
+    
+    // Helper for tests only: expose which peers this mock sees as connected
+    func getConnectedPeers() -> [String] {
+        return connectedPeerIDs
     }
     
     /// Automatic relay logic for room messages when no explicit packetDeliveryHandler is set
@@ -301,10 +363,10 @@ class MockBluetoothMeshService: BluetoothMeshService {
         guard originalSenderID != myPeerID else { return }
         
         // Decode regular message
-        guard let message = BitchatMessage.fromBinaryPayload(packet.payload) else { return }
+        guard let message = MchatMessage.fromBinaryPayload(packet.payload) else { return }
         
         // Create relay message
-        let relayMessage = BitchatMessage(
+        let relayMessage = MchatMessage(
             id: message.id,
             sender: message.sender,
             content: message.content,
@@ -314,7 +376,9 @@ class MockBluetoothMeshService: BluetoothMeshService {
             isPrivate: message.isPrivate,
             recipientNickname: message.recipientNickname,
             senderPeerID: message.senderPeerID,
-            mentions: message.mentions
+            mentions: message.mentions,
+            deliveryStatus: message.deliveryStatus,
+            conversationId: message.conversationId
         )
         
         // Create relay packet with decremented TTL
@@ -384,6 +448,9 @@ class MockBluetoothMeshService: BluetoothMeshService {
         
         sentPackets.append(packet)
         
+        // Local echo for sender (like broadcast messages do)
+        roomMessageDeliveryHandler?(roomMessage)
+        
         // Deliver room message to all connected peers
         deliverRoomMessageToConnectedPeers(roomMessage)
     }
@@ -402,68 +469,48 @@ class MockBluetoothMeshService: BluetoothMeshService {
             ttl: 2
         )
         
-        // Simulate campus gate check
-        if let currentCampusId = campusId {
-            // For testing, assume sender has valid presence if campus matches
-            if roomMessage.conversationId.starts(with: TopicManager.blake3_8("campus|\(currentCampusId)").prefix(8)) {
-                // Campus matches, check if joined (except for announcements)
-                let announcementsId = TopicManager.announcementsId(campusId: currentCampusId)
-                if roomMessage.conversationId == announcementsId || joinedConversations.contains(roomMessage.conversationId) {
-                    roomMessageDeliveryHandler?(roomMessage)
-                }
-            }
-        }
+        // Use the standard packet processing path to ensure proper deduplication
+        simulateIncomingPacket(packet)
     }
     
     // MARK: - Message Delivery Simulation
     
     /// Deliver a regular message to all connected peers
-    private func deliverMessageToConnectedPeers(_ message: BitchatMessage) {
+    private func deliverMessageToConnectedPeers(_ message: MchatMessage) {
         for peerID in connectedPeers {
             MockBluetoothMeshService.registryQueue.sync {
                 if let peerService = MockBluetoothMeshService.serviceRegistry[peerID] {
-                    // Check for duplicate delivery to this peer
-                    let messageKey = "\(message.id)-\(peerID)"
-                    let shouldDeliver = peerService.seenMessagesQueue.sync(flags: .barrier) {
-                        if peerService.seenMessageIDs.contains(messageKey) {
-                            return false // Already delivered
-                        } else {
-                            peerService.seenMessageIDs.insert(messageKey)
-                            return true
-                        }
-                    }
+                    // Convert legacy broadcast to room message format for unified delivery
+                    let campusId = self.campusId ?? "test.campus.edu"
+                    let broadcastId = TopicManager.broadcastId(campusId: campusId)
                     
-                    if shouldDeliver {
-                        // Deliver on main queue to simulate async network delivery
-                        DispatchQueue.main.async {
-                            peerService.messageDeliveryHandler?(message)
-                        }
-                        
-                        // Trigger relay logic separately to avoid recursion
-                        if let payload = message.toBinaryPayload() {
-                            // Preserve original sender information for relay logic
-                            let originalSenderID = Data(hexString: message.senderPeerID ?? self.myPeerID) ?? Data()
-                            let packet = BitchatPacket(
-                                type: 0x01,
-                                senderID: originalSenderID,  // Keep original sender for relay logic
-                                recipientID: nil,
-                                timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
-                                payload: payload,
-                                signature: nil,
-                                ttl: 2
-                            )
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                                peerService.packetDeliveryHandler?(packet)
-                            }
-                        }
-                    }
+                    let roomMessage = RoomMessage(
+                        conversationId: broadcastId,
+                        messageId: message.id,
+                        sender: message.sender,
+                        content: message.content,
+                        timestamp: message.timestamp,
+                        mentions: message.mentions
+                    )
+                    
+                    guard let roomMessageData = roomMessage.encode() else { return }
+                    let packet = BitchatPacket(
+                        type: MessageType.roomMessage.rawValue,
+                        senderID: Data(hexString: message.senderPeerID ?? self.myPeerID) ?? Data(),
+                        recipientID: SpecialRecipients.broadcast,
+                        timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+                        payload: roomMessageData,
+                        signature: nil,
+                        ttl: 2
+                    )
+                    peerService.simulateIncomingPacket(packet)
                 }
             }
         }
     }
     
     /// Deliver a private message to a specific recipient
-    private func deliverPrivateMessageToRecipient(_ message: BitchatMessage, recipientPeerID: String) {
+    private func deliverPrivateMessageToRecipient(_ message: MchatMessage, recipientPeerID: String) {
         MockBluetoothMeshService.registryQueue.sync {
             if let recipientService = MockBluetoothMeshService.serviceRegistry[recipientPeerID] {
                 // Check if we're connected to this recipient
@@ -472,7 +519,7 @@ class MockBluetoothMeshService: BluetoothMeshService {
                     let messageKey = "\(message.id)-\(recipientPeerID)"
                     let shouldDeliver = recipientService.seenMessagesQueue.sync(flags: .barrier) {
                         if recipientService.seenMessageIDs.contains(messageKey) {
-                            return false // Already delivered
+                            return false 
                         } else {
                             recipientService.seenMessageIDs.insert(messageKey)
                             return true
@@ -480,10 +527,8 @@ class MockBluetoothMeshService: BluetoothMeshService {
                     }
                     
                     if shouldDeliver {
-                        // Deliver on main queue to simulate async network delivery
-                        DispatchQueue.main.async {
-                            recipientService.messageDeliveryHandler?(message)
-                        }
+                        // Deliver synchronously for deterministic tests
+                        recipientService.messageDeliveryHandler?(message)
                     }
                 }
             }
@@ -502,41 +547,18 @@ class MockBluetoothMeshService: BluetoothMeshService {
                     if peerCampusId == self.campusId {
                         let isAnnouncements = roomMessage.conversationId == TopicManager.announcementsId(campusId: peerCampusId)
                         if isAnnouncements || peerService.joinedConversations.contains(roomMessage.conversationId) {
-                            // Check for duplicate delivery
-                            let messageKey = "\(roomMessage.messageId)-\(peerID)"
-                            let shouldDeliver = peerService.seenMessagesQueue.sync(flags: .barrier) {
-                                if peerService.seenMessageIDs.contains(messageKey) {
-                                    return false // Already delivered
-                                } else {
-                                    peerService.seenMessageIDs.insert(messageKey)
-                                    return true
-                                }
-                            }
-                            
-                            if shouldDeliver {
-                                // Deliver on main queue to simulate async network delivery
-                                DispatchQueue.main.async {
-                                    peerService.roomMessageDeliveryHandler?(roomMessage)
-                                }
-                                
-                                // Trigger relay logic separately to avoid recursion  
-                                if let roomMessageData = roomMessage.encode() {
-                                    // For room messages, preserve the original sender's peer ID for relay logic
-                                    // self.myPeerID is the original sender (Alice), which is what we want for relay
-                                    let originalSenderID = Data(hexString: self.myPeerID) ?? Data()
-                                    let packet = BitchatPacket(
-                                        type: MessageType.roomMessage.rawValue,
-                                        senderID: originalSenderID,  // Keep original sender for relay logic
-                                        recipientID: SpecialRecipients.broadcast,
-                                        timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
-                                        payload: roomMessageData,
-                                        signature: nil,
-                                        ttl: 2
-                                    )
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                                        peerService.packetDeliveryHandler?(packet)
-                                    }
-                                }
+                            if let roomMessageData = roomMessage.encode() {
+                                let originalSenderID = Data(hexString: self.myPeerID) ?? Data()
+                                let packet = BitchatPacket(
+                                    type: MessageType.roomMessage.rawValue,
+                                    senderID: originalSenderID,
+                                    recipientID: SpecialRecipients.broadcast,
+                                    timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+                                    payload: roomMessageData,
+                                    signature: nil,
+                                    ttl: 3
+                                )
+                                peerService.simulateIncomingPacket(packet)
                             }
                         }
                     }

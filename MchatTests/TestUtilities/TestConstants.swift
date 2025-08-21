@@ -1,6 +1,6 @@
 //
-// TestConstants.swift
-// bitchatTests
+// TestConstants.swift  
+// MchatTests           
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>

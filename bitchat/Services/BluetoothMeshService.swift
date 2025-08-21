@@ -359,6 +359,27 @@ class BluetoothMeshService: NSObject {
     func getNoiseService() -> NoiseEncryptionService {
         return noiseService
     }
+
+    // MARK: - DM Bin Padding (AEAD-side)
+    // Choose bins that tend to stay within one BLE PDU (~185 bytes usable on iOS)
+    // We bin the inner plaintext prior to AEAD to hide length while minimizing fragments.
+    private let dmBins: [Int] = [128, 160, 192, 256] // 256 fallback
+
+    func padDMPlaintextIfBeneficial(_ plaintext: Data) -> Data {
+        // Transport header is outside AEAD; we only control plaintext length here.
+        // Keep padding minimal: choose the smallest bin >= plaintext.count, but avoid wasting
+        // bytes if padding would push into >2 PDUs in common cases.
+        let len = plaintext.count
+        guard let target = dmBins.first(where: { $0 >= len }) else {
+            return plaintext // too large; will fragment anyway
+        }
+        let padLen = target - len
+        if padLen <= 0 { return plaintext } // Already at bin size, no padding needed
+        // PKCS#7-like padding on plaintext before AEAD (byte value = pad length)
+        var out = plaintext
+        out.append(contentsOf: [UInt8](repeating: UInt8(padLen), count: padLen))
+        return out
+    }
     
     
     private func cleanExpiredIdentityCache() {
@@ -1854,7 +1875,7 @@ class BluetoothMeshService: NSObject {
             if let presence = MembershipCredentialManager.shared.presenceBlob() {
                 // Reuse broadcast path; presence is a small JSON blob
                 let packet = BitchatPacket(
-                    type: MessageType.message.rawValue,
+                    type: MessageType.roomMessage.rawValue,
                     senderID: Data(hexString: self.myPeerID) ?? Data(),
                     recipientID: SpecialRecipients.broadcast,
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
@@ -2132,31 +2153,31 @@ class BluetoothMeshService: NSObject {
             let nickname = self.delegate as? ChatViewModel
             let senderNick = nickname?.nickname ?? self.myPeerID
             
-            let message = BitchatMessage(
-                id: messageID,
+            // Get campus ID for broadcast conversation
+            let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+            let broadcastConversationId = TopicManager.broadcastId(campusId: campusId)
+            
+            // Create RoomMessage for unified routing - all user content now goes through room format
+            let roomMessage = RoomMessage(
+                conversationId: broadcastConversationId,
+                messageId: messageID,
                 sender: senderNick,
                 content: content,
                 timestamp: timestamp ?? Date(),
-                isRelay: false,
-                originalSender: nil,
-                isPrivate: false,
-                recipientNickname: nil,
-                senderPeerID: self.myPeerID,
                 mentions: mentions.isEmpty ? nil : mentions
             )
             
-            if let messageData = message.toBinaryPayload() {
-                
-                
-                // Use unified message type with broadcast recipient
+            if let roomMessageData = roomMessage.encode() {
+                // Use roomMessage type for all user content
                 let packet = BitchatPacket(
-                    type: MessageType.message.rawValue,
+                    type: MessageType.roomMessage.rawValue,
                     senderID: Data(hexString: self.myPeerID) ?? Data(),
                     recipientID: SpecialRecipients.broadcast,  // Special broadcast ID
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000), // milliseconds
-                    payload: messageData,
+                    payload: roomMessageData,
                     signature: nil,
-                    ttl: self.adaptiveTTL                )
+                    ttl: self.adaptiveTTL
+                )
                 
                 // Track this message to prevent duplicate sends
                 let msgID = "\(packet.timestamp)-\(self.myPeerID)-\(packet.payload.prefix(32).hashValue)"
@@ -2986,16 +3007,16 @@ class BluetoothMeshService: NSObject {
             // Failed to convert packet - add to retry queue if it's our message
             let senderID = packet.senderID.hexEncodedString()
             if senderID == self.myPeerID,
-               packet.type == MessageType.message.rawValue,
-               let message = BitchatMessage.fromBinaryPayload(packet.payload) {
+               packet.type == MessageType.roomMessage.rawValue,
+               let roomMessage = RoomMessage.decode(from: packet.payload) {
                 MessageRetryService.shared.addMessageForRetry(
-                    content: message.content,
-                    mentions: message.mentions,
-                    isPrivate: message.isPrivate,
+                    content: roomMessage.content,
+                    mentions: roomMessage.mentions,
+                    isPrivate: false, // room messages are not private
                     recipientPeerID: nil,
-                    recipientNickname: message.recipientNickname,
-                    originalMessageID: message.id,
-                    originalTimestamp: message.timestamp
+                    recipientNickname: nil,
+                    originalMessageID: roomMessage.messageId,
+                    originalTimestamp: roomMessage.timestamp
                 )
             }
             return 
@@ -3065,16 +3086,16 @@ class BluetoothMeshService: NSObject {
             let senderID = packet.senderID.hexEncodedString()
             if senderID == self.myPeerID {
                 // This is our own message that failed to send
-                if packet.type == MessageType.message.rawValue,
-                   let message = BitchatMessage.fromBinaryPayload(packet.payload) {
+                if packet.type == MessageType.roomMessage.rawValue,
+                   let roomMessage = RoomMessage.decode(from: packet.payload) {
                     MessageRetryService.shared.addMessageForRetry(
-                        content: message.content,
-                        mentions: message.mentions,
-                        isPrivate: message.isPrivate,
+                        content: roomMessage.content,
+                        mentions: roomMessage.mentions,
+                        isPrivate: false, // room messages are not private
                         recipientPeerID: nil,
-                        recipientNickname: message.recipientNickname,
-                        originalMessageID: message.id,
-                        originalTimestamp: message.timestamp
+                        recipientNickname: nil,
+                        originalMessageID: roomMessage.messageId,
+                        originalTimestamp: roomMessage.timestamp
                     )
                 }
             }
@@ -3303,13 +3324,12 @@ class BluetoothMeshService: NSObject {
         
         switch MessageType(rawValue: packet.type) {
         case .message:
-            // Unified message handler for both broadcast and private messages
+            // LEGACY MESSAGE HANDLER - Convert to unified format
             // Convert binary senderID back to hex string
             let senderID = packet.senderID.hexEncodedString()
             if senderID.isEmpty {
                 return
             }
-            
             
             // Ignore our own messages
             if senderID == myPeerID {
@@ -3347,7 +3367,11 @@ class BluetoothMeshService: NSObject {
                         
                         let finalContent = message.content
                         
-                        let messageWithPeerID = BitchatMessage(
+                        // Convert legacy broadcast to unified format with broadcast conversationId
+                        let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+                        let broadcastConversationId = TopicManager.broadcastId(campusId: campusId)
+                        
+                        let messageWithPeerID = MchatMessage(
                             id: message.id,  // Preserve the original message ID
                             sender: message.sender,
                             content: finalContent,
@@ -3357,7 +3381,9 @@ class BluetoothMeshService: NSObject {
                             isPrivate: false,
                             recipientNickname: nil,
                             senderPeerID: senderID,
-                            mentions: message.mentions
+                            mentions: message.mentions,
+                            deliveryStatus: nil,
+                            conversationId: broadcastConversationId  // Unified conversation handling
                         )
                         
                         // Track last message time from this peer
@@ -3599,8 +3625,8 @@ class BluetoothMeshService: NSObject {
                 }
             }
             
-            // Convert RoomMessage to BitchatMessage for UI compatibility
-            let bitchatMessage = BitchatMessage(
+            // Convert RoomMessage to MchatMessage for unified UI handling
+            let mchatMessage = MchatMessage(
                 id: roomMessage.messageId,
                 sender: roomMessage.sender,
                 content: roomMessage.content,
@@ -3610,7 +3636,9 @@ class BluetoothMeshService: NSObject {
                 isPrivate: false, // Room messages are not private
                 recipientNickname: nil,
                 senderPeerID: senderID,
-                mentions: roomMessage.mentions
+                mentions: roomMessage.mentions,
+                deliveryStatus: nil,
+                conversationId: roomMessage.conversationId  // Include conversation context
             )
             
             // Track last message time from this peer
@@ -3625,10 +3653,10 @@ class BluetoothMeshService: NSObject {
             DispatchQueue.main.async {
                 // Create a custom delegate method for room messages that includes conversation ID
                 if let chatViewModel = self.delegate as? ChatViewModel {
-                    chatViewModel.didReceiveRoomMessage(bitchatMessage, in: roomMessage.conversationId)
+                    chatViewModel.didReceiveRoomMessage(mchatMessage, in: roomMessage.conversationId)
                 } else {
                     // Fallback to regular message handling if delegate doesn't support room messages yet
-                    self.delegate?.didReceiveMessage(bitchatMessage)
+                    self.delegate?.didReceiveMessage(mchatMessage)
                 }
             }
             
@@ -4658,8 +4686,8 @@ class BluetoothMeshService: NSObject {
             }
         }
         
-        // Convert RoomMessage to BitchatMessage for UI compatibility
-        let bitchatMessage = BitchatMessage(
+        // Convert RoomMessage to MchatMessage for unified UI handling
+        let mchatMessage = MchatMessage(
             id: roomMessage.messageId,
             sender: roomMessage.sender,
             content: roomMessage.content,
@@ -4669,7 +4697,9 @@ class BluetoothMeshService: NSObject {
             isPrivate: false, // Room messages are not private
             recipientNickname: nil,
             senderPeerID: senderID,
-            mentions: roomMessage.mentions
+            mentions: roomMessage.mentions,
+            deliveryStatus: nil,
+            conversationId: roomMessage.conversationId  // Include conversation context
         )
         
         // Track last message time from this peer
@@ -4684,10 +4714,10 @@ class BluetoothMeshService: NSObject {
         DispatchQueue.main.async {
             // Create a custom delegate method for room messages that includes conversation ID
             if let chatViewModel = self.delegate as? ChatViewModel {
-                chatViewModel.didReceiveRoomMessage(bitchatMessage, in: roomMessage.conversationId)
+                chatViewModel.didReceiveRoomMessage(mchatMessage, in: roomMessage.conversationId)
             } else {
                 // Fallback to regular message handling if delegate doesn't support room messages yet
-                self.delegate?.didReceiveMessage(bitchatMessage)
+                self.delegate?.didReceiveMessage(mchatMessage)
             }
         }
         
@@ -6199,7 +6229,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         }
         
         // Determine which rate limiter to use based on message type
-        let isChatMessage = messageType == MessageType.message.rawValue
+        let isChatMessage = messageType == MessageType.roomMessage.rawValue
         
         let limiter = isChatMessage ? messageRateLimiter : protocolMessageRateLimiter
         let maxPerMinute = isChatMessage ? maxChatMessagesPerPeerPerMinute : maxProtocolMessagesPerPeerPerMinute
@@ -6248,7 +6278,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         totalMessageTimestamps.append(now)
         
         // Determine which rate limiter to use based on message type
-        let isChatMessage = messageType == MessageType.message.rawValue
+        let isChatMessage = messageType == MessageType.roomMessage.rawValue
         
         // Record for specific peer in the appropriate limiter
         if isChatMessage {
@@ -6882,8 +6912,10 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
                 }
             }
             
-            // Try to parse as a full inner packet (for backward compatibility and other message types)
-            if let innerPacket = BitchatPacket.from(decryptedData) {
+            // Try to parse as a full inner packet (DM message).
+            // First remove optional DM bin padding (PKCS#7 style applied pre-AEAD)
+            let dmPlain = self.unpadDMBinPadding(decryptedData)
+            if let innerPacket = BitchatPacket.from(dmPlain) {
                 // Successfully parsed inner packet
                 
                 // Process the decrypted inner packet
@@ -6907,10 +6939,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
                 sendProtocolNack(for: originalPacket, to: peerID,
                                reason: "Decryption failed",
                                errorCode: .decryptionFailed)
-                
-                // The NACK handler will take care of clearing sessions and re-establishing
-                // Don't initiate anything here to avoid race conditions
-                
+            
                 // Update UI to show encryption is broken
                 DispatchQueue.main.async { [weak self] in
                     if let chatVM = self?.delegate as? ChatViewModel {
@@ -6920,13 +6949,33 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             }
         }
     }
-    
+
+    // Remove PKCS#7-like padding used for DM binning after AEAD verify.
+    // Guardrails:
+    // - Valid PKCS#7 tail (all last padLen bytes equal padLen)
+    // - Bin-consistency: only unpad if result maps to previous bin size
+    func unpadDMBinPadding(_ data: Data) -> Data {
+        guard !data.isEmpty else { return data }
+        let padLen = Int(data.last!)
+        
+        // Basic sanity checks
+        guard padLen > 0 && padLen <= 255 && padLen <= data.count else { return data }
+        
+        let start = data.count - padLen
+        // Strict PKCS#7 validation
+        for i in start..<data.count {
+            if data[i] != UInt8(padLen) { return data }
+        }
+        
+        // Bin-consistency: after removing pad, we should land in prior bin
+        let unpaddedSize = data.count - padLen
+        let expectedBin = dmBins.first(where: { $0 >= unpaddedSize })
+        guard expectedBin == data.count else { return data }
+        
+        return Data(data.prefix(start))
+    }
     
     // MARK: - Protocol Version Negotiation
-    
-    
-    
-    
     
     private func getPlatformString() -> String {
         #if os(iOS)
@@ -7061,19 +7110,6 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         
         SecureLogger.log("Received handshake request from \(request.requesterID) (\(request.requesterNickname)) with \(request.pendingMessageCount) pending messages", 
                        category: SecureLogger.noise, level: .info)
-        
-        // Don't show handshake request notification in UI
-        // User requested to remove this notification
-        /*
-        DispatchQueue.main.async { [weak self] in
-            if let chatVM = self?.delegate as? ChatViewModel {
-                // Notify the UI that someone wants to send messages
-                chatVM.handleHandshakeRequest(from: request.requesterID, 
-                                            nickname: request.requesterNickname,
-                                            pendingCount: request.pendingMessageCount)
-            }
-        }
-        */
         
         // Check if we already have a session
         if noiseService.hasEstablishedSession(with: peerID) {
@@ -7597,18 +7633,29 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             senderPeerID: myPeerID
         )
         
-        // Use binary payload format to match the receiver's expectations
-        guard let messageData = message.toBinaryPayload() else { 
-            return 
-        }
+        // Legacy message creation removed - now using unified room message format
         
-        // Create inner packet
+        // Create DM room message for unified routing
+        let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+        let dmConversationId = TopicManager.dmId(peerA: myPeerID, peerB: recipientPeerID, campusId: campusId)
+        
+        let roomMessage = RoomMessage(
+            conversationId: dmConversationId,
+            messageId: msgID,
+            sender: senderNick,
+            content: content,
+            mentions: nil
+        )
+        
+        guard let roomMessageData = roomMessage.encode() else { return }
+        
+        // Create inner packet using room message format
         let innerPacket = BitchatPacket(
-            type: MessageType.message.rawValue,
+            type: MessageType.roomMessage.rawValue,
             senderID: Data(hexString: myPeerID) ?? Data(),
             recipientID: Data(hexString: recipientPeerID) ?? Data(),
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
-            payload: messageData,
+            payload: roomMessageData,
             signature: nil,
             ttl: self.adaptiveTTL // Inner packet needs valid TTL for processing after decryption
         )
@@ -7616,9 +7663,11 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         guard let innerData = innerPacket.toBinaryData() else { return }
         
         do {
-            // Encrypt with Noise
-            // Encrypting private message
-            let encryptedData = try noiseService.encrypt(innerData, for: recipientPeerID)
+            // Apply AEAD-side bin padding for DMs to keep most messages within 1 BLE PDU
+            let paddedInner = self.padDMPlaintextIfBeneficial(innerData)
+            
+            // Encrypt with Noise (AEAD)
+            let encryptedData = try noiseService.encrypt(paddedInner, for: recipientPeerID)
             // Successfully encrypted
             
             // Update last successful message time

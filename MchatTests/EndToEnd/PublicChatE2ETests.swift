@@ -1,6 +1,6 @@
 //
 // PublicChatE2ETests.swift
-// bitchatTests
+// MchatTests   
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -16,7 +16,7 @@ final class PublicChatE2ETests: XCTestCase {
     var charlie: MockBluetoothMeshService!
     var david: MockBluetoothMeshService!
     
-    var receivedMessages: [String: [BitchatMessage]] = [:]
+    var receivedMessages: [String: [MchatMessage]] = [:]
     
     override func setUp() {
         super.setUp()
@@ -98,11 +98,11 @@ final class PublicChatE2ETests: XCTestCase {
         // Set up relay in Bob
         bob.packetDeliveryHandler = { packet in
             // Bob should relay to Charlie
-            if let message = BitchatMessage.fromBinaryPayload(packet.payload),
+            if let message = MchatMessage.fromBinaryPayload(packet.payload),
                message.sender == TestConstants.testNickname1 {
                 
                 // Create relay message
-                let relayMessage = BitchatMessage(
+                let relayMessage = MchatMessage(
                     id: message.id,
                     sender: message.sender,
                     content: message.content,
@@ -605,8 +605,8 @@ final class PublicChatE2ETests: XCTestCase {
     }
     
     private func simulateConnection(_ peer1: MockBluetoothMeshService, _ peer2: MockBluetoothMeshService) {
-        peer1.simulateConnectedPeer(peer2.peerID)
-        peer2.simulateConnectedPeer(peer1.peerID)
+        peer1.simulateConnectedPeer(peer2.myPeerID)
+        peer2.simulateConnectedPeer(peer1.myPeerID)
     }
     
     private func setupRelayHandler(_ node: MockBluetoothMeshService, nextHops: [MockBluetoothMeshService]) {
@@ -614,12 +614,12 @@ final class PublicChatE2ETests: XCTestCase {
             // Check if should relay
             guard packet.ttl > 1 else { return }
             
-            if let message = BitchatMessage.fromBinaryPayload(packet.payload) {
+            if let message = MchatMessage.fromBinaryPayload(packet.payload) {
                 // Don't relay own messages
-                guard message.senderPeerID != node.peerID else { return }
+                guard message.senderPeerID != node.myPeerID else { return }
                 
                 // Create relay message
-                let relayMessage = BitchatMessage(
+                let relayMessage = MchatMessage(
                     id: message.id,
                     sender: message.sender,
                     content: message.content,
@@ -635,7 +635,7 @@ final class PublicChatE2ETests: XCTestCase {
                 if let relayPayload = relayMessage.toBinaryPayload() {
                     let relayPacket = BitchatPacket(
                         type: packet.type,
-                        senderID: node.peerID.data(using: .utf8) ?? Data(),
+                        senderID: node.myPeerID.data(using: .utf8) ?? Data(),
                         recipientID: packet.recipientID,
                         timestamp: packet.timestamp,
                         payload: relayPayload,

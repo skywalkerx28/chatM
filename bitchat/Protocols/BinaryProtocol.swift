@@ -114,6 +114,7 @@ struct BinaryProtocol {
         static let hasRecipient: UInt8 = 0x01
         static let hasSignature: UInt8 = 0x02
         static let isCompressed: UInt8 = 0x04
+        static let campusRequired: UInt8 = 0x08  // Campus-gate enforcement required
     }
     
     // Encode BitchatPacket to binary format
@@ -159,6 +160,10 @@ struct BinaryProtocol {
         if isCompressed {
             flags |= Flags.isCompressed
         }
+        // Set campus flag for room messages
+        if packet.type == MessageType.roomMessage.rawValue {
+            flags |= Flags.campusRequired
+        }
         data.append(flags)
         
         // Payload length (2 bytes, big-endian) - includes original size if compressed
@@ -199,12 +204,15 @@ struct BinaryProtocol {
         }
         
         
-        // Apply padding to standard block sizes for traffic analysis resistance
-        let optimalSize = MessagePadding.optimalBlockSize(for: data.count)
-        let paddedData = MessagePadding.pad(data, toSize: optimalSize)
-        
-        
-        return paddedData
+        // Apply transport padding except for Noise-encrypted (DM) packets where
+        // length-hiding is handled inside the AEAD layer (bin padding)
+        if packet.type == MessageType.noiseEncrypted.rawValue {
+            return data
+        } else {
+            let optimalSize = MessagePadding.optimalBlockSize(for: data.count)
+            let paddedData = MessagePadding.pad(data, toSize: optimalSize)
+            return paddedData
+        }
     }
     
     // Decode binary data to BitchatPacket
@@ -248,6 +256,7 @@ struct BinaryProtocol {
         let hasRecipient = (flags & Flags.hasRecipient) != 0
         let hasSignature = (flags & Flags.hasSignature) != 0
         let isCompressed = (flags & Flags.isCompressed) != 0
+        let campusRequired = (flags & Flags.campusRequired) != 0
         
         // Payload length - need 2 bytes
         guard offset + 2 <= unpaddedData.count else { return nil }
@@ -327,8 +336,9 @@ struct BinaryProtocol {
             offset += signatureSize
         }
         
-        // Final validation: ensure we haven't gone past the end
-        guard offset <= unpaddedData.count else { return nil }
+        // Final validation: ensure we consumed exactly all the data
+        // This prevents accepting truncated packets that might decode partially
+        guard offset == unpaddedData.count else { return nil }
         
         return BitchatPacket(
             type: type,
@@ -337,17 +347,20 @@ struct BinaryProtocol {
             timestamp: timestamp,
             payload: payload,
             signature: signature,
-            ttl: ttl
+            ttl: ttl,
+            campusRequired: campusRequired
         )
     }
 }
 
-// Binary encoding for BitchatMessage
-extension BitchatMessage {
+// Binary encoding for MchatMessage (legacy .message format)
+// NOTE: This is only used for legacy .message (0x04) packets
+// New sends should use RoomMessage format in .roomMessage (0x14) packets
+extension MchatMessage {
     func toBinaryPayload() -> Data? {
         var data = Data()
         
-        // Message format:
+        // Legacy Message format (for backward compatibility):
         // - Flags: 1 byte (bit 0: isRelay, bit 1: isPrivate, bit 2: hasOriginalSender, bit 3: hasRecipientNickname, bit 4: hasSenderPeerID, bit 5: hasMentions)
         // - Timestamp: 8 bytes (seconds since epoch)
         // - ID length: 1 byte
@@ -361,6 +374,7 @@ extension BitchatMessage {
         // - Recipient nickname length + data
         // - Sender peer ID length + data
         // - Mentions array
+        // NOTE: conversationId is NOT included in legacy format
         
         var flags: UInt8 = 0
         if isRelay { flags |= 0x01 }
@@ -439,7 +453,7 @@ extension BitchatMessage {
         return data
     }
     
-    static func fromBinaryPayload(_ data: Data) -> BitchatMessage? {
+    static func fromBinaryPayload(_ data: Data) -> MchatMessage? {
         // Create an immutable copy to prevent threading issues
         let dataCopy = Data(data)
         
@@ -559,7 +573,7 @@ extension BitchatMessage {
             }
         }
         
-        let message = BitchatMessage(
+        let message = MchatMessage(
             id: id,
             sender: sender,
             content: content,
@@ -569,7 +583,9 @@ extension BitchatMessage {
             isPrivate: isPrivate,
             recipientNickname: recipientNickname,
             senderPeerID: senderPeerID,
-            mentions: mentions
+            mentions: mentions,
+            deliveryStatus: nil,
+            conversationId: nil  
         )
         return message
     }

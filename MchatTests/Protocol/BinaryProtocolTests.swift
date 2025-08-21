@@ -1,6 +1,6 @@
 //
 // BinaryProtocolTests.swift
-// bitchatTests
+// MchatTests
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -115,6 +115,55 @@ final class BinaryProtocolTests: XCTestCase {
         
         XCTAssertEqual(decodedPacket.payload, smallPayload)
     }
+
+    // MARK: - DM Bin Padding Tests
+
+    func testDMBinPaddingRoundTrip() throws {
+        let service = BluetoothMeshService()
+        
+        // Test with different size inputs to verify padding works correctly
+        let testSizes = [50, 100, 150, 200, 256] // Different sizes including one at bin boundary
+        
+        for size in testSizes {
+            let testData = Data(repeating: 0x42, count: size)
+            
+            // Apply padding utility, then verify unpad restores original
+            let padded = service.padDMPlaintextIfBeneficial(testData)
+            let unpadded = service.unpadDMBinPadding(padded)
+            
+            XCTAssertEqual(unpadded, testData, "DM bin padding should be reversible for \(size) bytes")
+            
+            // If padding was applied, ensure it's to a valid bin size
+            if padded.count > testData.count {
+                XCTAssertTrue([128, 160, 192, 256].contains(padded.count), "Padded size should be a valid bin")
+            }
+        }
+    }
+
+    func testNoiseEncryptedSkipsTransportPadding() throws {
+        // Create a small noiseEncrypted packet (simulated ciphertext)
+        let ciphertext = TestHelpers.generateRandomData(length: 64)
+        let packet = BitchatPacket(
+            type: MessageType.noiseEncrypted.rawValue,
+            senderID: Data(repeating: 0x01, count: BinaryProtocol.senderIDSize),
+            recipientID: Data(repeating: 0x02, count: BinaryProtocol.recipientIDSize),
+            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+            payload: ciphertext,
+            signature: nil,
+            ttl: 2
+        )
+        guard let encoded = BinaryProtocol.encode(packet) else { return XCTFail("encode failed") }
+        
+        
+        // Expected size: Header (13 bytes) + SenderID (8) + RecipientID (8) + payload (64) = 93
+        // But there might be a discrepancy in the header size constant vs actual size
+        let actualHeaderSize = 1 + 1 + 1 + 8 + 1 + 2 // version + type + ttl + timestamp + flags + payloadLength = 14
+        let expectedMinSize = actualHeaderSize + BinaryProtocol.senderIDSize + BinaryProtocol.recipientIDSize + ciphertext.count
+        
+        // Should not be padded to standard block sizes (128, 256, etc.) for noiseEncrypted
+        XCTAssertEqual(encoded.count, expectedMinSize, "noiseEncrypted should skip transport padding")
+        XCTAssertFalse([128, 256, 512].contains(encoded.count), "noiseEncrypted should not be padded to block sizes")
+    }
     
     // MARK: - Message Padding Tests
     
@@ -165,7 +214,7 @@ final class BinaryProtocolTests: XCTestCase {
             return
         }
         
-        guard let decodedMessage = BitchatMessage.fromBinaryPayload(payload) else {
+        guard let decodedMessage = MchatMessage.fromBinaryPayload(payload) else {
             XCTFail("Failed to decode message from binary")
             return
         }
@@ -187,7 +236,7 @@ final class BinaryProtocolTests: XCTestCase {
         )
         
         guard let payload = message.toBinaryPayload(),
-              let decodedMessage = BitchatMessage.fromBinaryPayload(payload) else {
+              let decodedMessage = MchatMessage.fromBinaryPayload(payload) else {
             XCTFail("Failed to encode/decode private message")
             return
         }
@@ -201,7 +250,7 @@ final class BinaryProtocolTests: XCTestCase {
         let message = TestHelpers.createTestMessage(mentions: mentions)
         
         guard let payload = message.toBinaryPayload(),
-              let decodedMessage = BitchatMessage.fromBinaryPayload(payload) else {
+              let decodedMessage = MchatMessage.fromBinaryPayload(payload) else {
             XCTFail("Failed to encode/decode message with mentions")
             return
         }
@@ -210,7 +259,7 @@ final class BinaryProtocolTests: XCTestCase {
     }
     
     func testRelayMessageEncoding() throws {
-        let message = BitchatMessage(
+        let message = MchatMessage(
             id: UUID().uuidString,
             sender: TestConstants.testNickname1,
             content: TestConstants.testMessage1,
@@ -224,7 +273,7 @@ final class BinaryProtocolTests: XCTestCase {
         )
         
         guard let payload = message.toBinaryPayload(),
-              let decodedMessage = BitchatMessage.fromBinaryPayload(payload) else {
+              let decodedMessage = MchatMessage.fromBinaryPayload(payload) else {
             XCTFail("Failed to encode/decode relay message")
             return
         }
@@ -262,7 +311,7 @@ final class BinaryProtocolTests: XCTestCase {
         let message = TestHelpers.createTestMessage(content: largeContent)
         
         guard let payload = message.toBinaryPayload(),
-              let decodedMessage = BitchatMessage.fromBinaryPayload(payload) else {
+              let decodedMessage = MchatMessage.fromBinaryPayload(payload) else {
             XCTFail("Failed to handle large message")
             return
         }
@@ -275,7 +324,7 @@ final class BinaryProtocolTests: XCTestCase {
         let emptyMessage = TestHelpers.createTestMessage(content: "")
         
         guard let payload = emptyMessage.toBinaryPayload(),
-              let decodedMessage = BitchatMessage.fromBinaryPayload(payload) else {
+              let decodedMessage = MchatMessage.fromBinaryPayload(payload) else {
             XCTFail("Failed to handle empty message")
             return
         }
@@ -312,6 +361,104 @@ final class BinaryProtocolTests: XCTestCase {
         
         // Should fail to decode
         XCTAssertNil(BinaryProtocol.decode(encoded))
+    }
+    
+    // MARK: - Additional Robustness & Flags Tests
+    
+    func testCampusRequiredFlagSetForRoomMessage() throws {
+        // Any payload is fine; flag depends on type
+        let payload = "room".data(using: .utf8)!
+        let packet = BitchatPacket(
+            type: MessageType.roomMessage.rawValue,
+            senderID: Data(repeating: 0x01, count: BinaryProtocol.senderIDSize),
+            recipientID: nil,
+            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+            payload: payload,
+            signature: nil,
+            ttl: 2
+        )
+        guard let encoded = BinaryProtocol.encode(packet),
+              let decoded = BinaryProtocol.decode(encoded) else {
+            return XCTFail("encode/decode failed for roomMessage flag check")
+        }
+        XCTAssertTrue(decoded.campusRequired, "roomMessage packets must set campusRequired flag")
+    }
+    
+    func testSenderIDShortPaddingRoundtrip() throws {
+        // SenderID shorter than 8 should be padded during encode and preserved after decode
+        let shortSender = Data([1,2,3,4,5])
+        let packet = BitchatPacket(
+            type: MessageType.message.rawValue,
+            senderID: shortSender,
+            recipientID: nil,
+            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+            payload: "hi".data(using: .utf8)!,
+            signature: nil,
+            ttl: 2
+        )
+        guard let encoded = BinaryProtocol.encode(packet),
+              let decoded = BinaryProtocol.decode(encoded) else {
+            return XCTFail("encode/decode failed for short senderID")
+        }
+        // Expect fixed-width 8-byte SenderID on decode. Verify prefix and zero padding.
+        XCTAssertEqual(decoded.senderID.count, BinaryProtocol.senderIDSize)
+        XCTAssertEqual(decoded.senderID.prefix(shortSender.count), shortSender)
+        XCTAssertTrue(decoded.senderID.dropFirst(shortSender.count).allSatisfy { $0 == 0 })
+    }
+    
+    func testCombinedFlagsCompressedSignedRecipient() throws {
+        // Large compressible payload + signature + recipient
+        let largeText = String(repeating: "Lorem ipsum dolor sit amet ", count: 60)
+        let payload = largeText.data(using: .utf8)!
+        let recipient = Data(repeating: 0xAB, count: BinaryProtocol.recipientIDSize)
+        let packet = BitchatPacket(
+            type: MessageType.message.rawValue,
+            senderID: Data(repeating: 0xCD, count: BinaryProtocol.senderIDSize),
+            recipientID: recipient,
+            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+            payload: payload,
+            signature: TestConstants.testSignature,
+            ttl: 2
+        )
+        guard let encoded = BinaryProtocol.encode(packet),
+              let decoded = BinaryProtocol.decode(encoded) else {
+            return XCTFail("encode/decode failed for combined flags case")
+        }
+        XCTAssertNotNil(decoded.recipientID)
+        XCTAssertEqual(decoded.recipientID, recipient)
+        XCTAssertNotNil(decoded.signature)
+        XCTAssertEqual(decoded.payload, payload)
+    }
+    
+    func testTTLBoundsPreserved() throws {
+        for ttl: UInt8 in [0, 255] {
+            let packet = BitchatPacket(
+                type: MessageType.message.rawValue,
+                senderID: Data(repeating: 0xEF, count: BinaryProtocol.senderIDSize),
+                recipientID: nil,
+                timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+                payload: Data([0x01]),
+                signature: nil,
+                ttl: ttl
+            )
+            guard let encoded = BinaryProtocol.encode(packet),
+                  let decoded = BinaryProtocol.decode(encoded) else {
+                return XCTFail("encode/decode failed for TTL=\(ttl)")
+            }
+            XCTAssertEqual(decoded.ttl, ttl)
+        }
+    }
+    
+    func testRejectsTrailingGarbageAfterPadding() throws {
+        // Start from a valid, padded packet
+        let pkt = TestHelpers.createTestPacket(payload: Data([0x11, 0x22, 0x33]))
+        guard var encoded = BinaryProtocol.encode(pkt) else {
+            return XCTFail("failed to encode base packet")
+        }
+        // Append non-PKCS#7 trailing bytes (break padding)
+        encoded.append(contentsOf: [0xAA, 0xBB])
+        let result = BinaryProtocol.decode(encoded)
+        XCTAssertNil(result, "Decoder must reject packets with trailing garbage after padding")
     }
     
     // MARK: - Bounds Checking Tests (Crash Prevention)

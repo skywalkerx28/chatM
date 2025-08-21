@@ -71,6 +71,7 @@ struct RoomMessage {
 extension RoomMessage {
     
     /// Encodes the room message to binary format for transmission
+    /// Uses BinaryEncodingUtils for consistent and efficient encoding
     func encode() -> Data? {
         var data = Data()
         
@@ -78,57 +79,31 @@ extension RoomMessage {
         var flags: UInt8 = 0
         if isEncrypted { flags |= 0x02 }  // Bit 1
         if hasMentions { flags |= 0x04 }  // Bit 2
-        data.append(flags)
+        data.appendUInt8(flags)
         
         // ConversationIdLength (1 byte) - fixed to 32
-        data.append(0x20) // Always 32 bytes
+        data.appendUInt8(0x20) // Always 32 bytes
         
         // ConversationId (32 bytes)
         data.append(conversationId)
         
-        // Timestamp (8 bytes, milliseconds since epoch)
-        let timestampMillis = UInt64(timestamp.timeIntervalSince1970 * 1000)
-        for i in (0..<8).reversed() {
-            data.append(UInt8((timestampMillis >> (i * 8)) & 0xFF))
-        }
+        // Timestamp (8 bytes, milliseconds since epoch) - use utility function
+        data.appendDate(timestamp)
         
-        // MessageId (variable length, max 255)
-        if let messageIdData = messageId.data(using: .utf8) {
-            data.append(UInt8(min(messageIdData.count, 255)))
-            data.append(messageIdData.prefix(255))
-        } else {
-            data.append(0) // Should not happen if messageId is always set
-        }
+        // MessageId (variable length, max 255) - use utility function
+        data.appendString(messageId, maxLength: 255)
         
-        // Sender (variable length, max 255)
-        if let senderData = sender.data(using: .utf8) {
-            data.append(UInt8(min(senderData.count, 255)))
-            data.append(senderData.prefix(255))
-        } else {
-            data.append(0) // Should not happen if sender is always set
-        }
+        // Sender (variable length, max 255) - use utility function
+        data.appendString(sender, maxLength: 255)
         
-        // Content (variable length, max 65535)
-        if let contentData = content.data(using: .utf8) {
-            let length = UInt16(min(contentData.count, 65535))
-            // Encode length as 2 bytes, big-endian
-            data.append(UInt8((length >> 8) & 0xFF))
-            data.append(UInt8(length & 0xFF))
-            data.append(contentData.prefix(Int(length)))
-        } else {
-            data.append(contentsOf: [0, 0]) // Should not happen if content is always set
-        }
+        // Content (variable length, max 65535) - use utility function  
+        data.appendString(content, maxLength: 65535)
         
-        // Optional fields
+        // Optional fields - mentions array
         if let mentions = mentions, !mentions.isEmpty {
-            data.append(UInt8(min(mentions.count, 255))) // Number of mentions
+            data.appendUInt8(UInt8(min(mentions.count, 255))) // Number of mentions
             for mention in mentions.prefix(255) {
-                if let mentionData = mention.data(using: .utf8) {
-                    data.append(UInt8(min(mentionData.count, 255)))
-                    data.append(mentionData.prefix(255))
-                } else {
-                    data.append(0) // Should not happen if mention is always set
-                }
+                data.appendString(mention, maxLength: 255)
             }
         }
         
@@ -136,80 +111,50 @@ extension RoomMessage {
     }
     
     /// Decodes a room message from binary format
+    /// Uses BinaryEncodingUtils for consistent and safe decoding
     static func decode(from data: Data) -> RoomMessage? {
         guard data.count >= 44 else { return nil } // Minimum size check
         
         var offset = 0
         
-        // Flags
-        guard offset < data.count else { return nil }
-        let flags = data[offset]; offset += 1
+        // Flags - use utility function
+        guard let flags = data.readUInt8(at: &offset) else { return nil }
         let hasMentions = (flags & 0x04) != 0
         
-        // ConversationId length
-        guard offset < data.count else { return nil }
-        let conversationIdLength = Int(data[offset]); offset += 1
-        guard conversationIdLength == 32 else { return nil } // Must be exactly 32 bytes
+        // ConversationId length - use utility function
+        guard let conversationIdLength = data.readUInt8(at: &offset),
+              conversationIdLength == 32 else { return nil } // Must be exactly 32 bytes
         
-        // ConversationId
-        guard offset + 32 <= data.count else { return nil }
-        let conversationId = data[offset..<offset+32]
-        offset += 32
+        // ConversationId - use utility function
+        guard let conversationId = data.readFixedBytes(at: &offset, count: 32) else { return nil }
         
-        // Timestamp
-        guard offset + 8 <= data.count else { return nil }
-        let timestampData = data[offset..<offset+8]
-        let timestampMillis = timestampData.reduce(0) { result, byte in
-            (result << 8) | UInt64(byte)
-        }
-        offset += 8
-        let timestamp = Date(timeIntervalSince1970: TimeInterval(timestampMillis) / 1000.0)
+        // Timestamp - use utility function
+        guard let timestamp = data.readDate(at: &offset) else { return nil }
         
-        // MessageId
-        guard offset < data.count else { return nil }
-        let messageIdLength = Int(data[offset]); offset += 1
-        guard offset + messageIdLength <= data.count else { return nil }
-        let messageId = String(data: data[offset..<offset+messageIdLength], encoding: .utf8) ?? UUID().uuidString
-        offset += messageIdLength
+        // MessageId - use utility function
+        guard let messageId = data.readString(at: &offset, maxLength: 255) else { return nil }
         
-        // Sender
-        guard offset < data.count else { return nil }
-        let senderLength = Int(data[offset]); offset += 1
-        guard offset + senderLength <= data.count else { return nil }
-        let sender = String(data: data[offset..<offset+senderLength], encoding: .utf8) ?? "unknown"
-        offset += senderLength
+        // Sender - use utility function
+        guard let sender = data.readString(at: &offset, maxLength: 255) else { return nil }
         
-        // Content
-        guard offset + 2 <= data.count else { return nil }
-        let contentLengthData = data[offset..<offset+2]
-        let contentLength = Int(contentLengthData.reduce(0) { result, byte in
-            (result << 8) | UInt16(byte)
-        })
-        offset += 2
-        guard offset + contentLength <= data.count else { return nil }
-        let content = String(data: data[offset..<offset+contentLength], encoding: .utf8) ?? ""
-        offset += contentLength
+        // Content - use utility function
+        guard let content = data.readString(at: &offset, maxLength: 65535) else { return nil }
         
-        // Mentions (if present)
+        // Mentions (if present) - use utility functions
         var mentions: [String]? = nil
-        if hasMentions && offset < data.count {
-            let mentionCount = Int(data[offset]); offset += 1
+        if hasMentions {
+            guard let mentionCount = data.readUInt8(at: &offset) else { return nil }
             if mentionCount > 0 {
                 mentions = []
                 for _ in 0..<mentionCount {
-                    guard offset < data.count else { break }
-                    let length = Int(data[offset]); offset += 1
-                    guard offset + length <= data.count else { break }
-                    if let mention = String(data: data[offset..<offset+length], encoding: .utf8) {
-                        mentions?.append(mention)
-                    }
-                    offset += length
+                    guard let mention = data.readString(at: &offset, maxLength: 255) else { break }
+                    mentions?.append(mention)
                 }
             }
         }
         
         return RoomMessage(
-            conversationId: Data(conversationId),
+            conversationId: conversationId,
             messageId: messageId,
             sender: sender,
             content: content,

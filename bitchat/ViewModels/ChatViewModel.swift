@@ -92,7 +92,7 @@ import UIKit
 class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Published Properties
     
-    @Published var messages: [BitchatMessage] = []
+    @Published var messages: [MchatMessage] = []
     private let maxMessages = 1337 // Maximum messages before oldest are removed
     @Published var connectedPeers: [String] = []
     @Published var allPeers: [BitchatPeer] = []  // Unified peer list including favorites
@@ -109,7 +109,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
         }
     }
     @Published var isConnected = false
-    @Published var privateChats: [String: [BitchatMessage]] = [:] // peerID -> messages
+    @Published var privateChats: [String: [MchatMessage]] = [:] // peerID -> messages
     @Published var selectedPrivateChatPeer: String? = nil
     private var selectedPrivateChatFingerprint: String? = nil  // Track by fingerprint for persistence across reconnections
     @Published var unreadPrivateMessages: Set<String> = []
@@ -120,7 +120,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
     
     // MARK: - Room/Conversation Properties
     
-    @Published var joinedConversations: [Data: [BitchatMessage]] = [:] // conversationId -> messages
+    @Published var joinedConversations: [Data: [MchatMessage]] = [:] // conversationId -> messages
     @Published var selectedConversation: Data? = nil
     @Published var unreadRoomMessages: Set<Data> = [] // conversationIds with unread messages
     private let maxRoomMessages = 1337 // Maximum messages per room before oldest are removed
@@ -696,8 +696,11 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
             // Parse mentions from the content
             let mentions = parseMentions(from: content)
             
-            // Add message to local display
-            let message = BitchatMessage(
+            // Add message to local display - use broadcast conversationId for unified handling
+            let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+            let broadcastConversationId = TopicManager.broadcastId(campusId: campusId)
+            
+            let message = MchatMessage(
                 sender: nickname,
                 content: content,
                 timestamp: Date(),
@@ -706,7 +709,9 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
                 isPrivate: false,
                 recipientNickname: nil,
                 senderPeerID: meshService.myPeerID,
-                mentions: mentions.isEmpty ? nil : mentions
+                mentions: mentions.isEmpty ? nil : mentions,
+                deliveryStatus: .sending,
+                conversationId: broadcastConversationId
             )
             
             // Add to main messages immediately for user feedback
@@ -2085,7 +2090,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
     
     // MARK: - Message Management
     
-    private func addMessage(_ message: BitchatMessage) {
+    private func addMessage(_ message: MchatMessage) {
         // Check for duplicates
         guard !messages.contains(where: { $0.id == message.id }) else { return }
         
@@ -2094,7 +2099,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
         trimMessagesIfNeeded()
     }
     
-    private func addPrivateMessage(_ message: BitchatMessage, for peerID: String) {
+    private func addPrivateMessage(_ message: MchatMessage, for peerID: String) {
         if privateChats[peerID] == nil {
             privateChats[peerID] = []
         }
@@ -2676,7 +2681,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
         }
     }
     
-    func didReceiveMessage(_ message: BitchatMessage) {
+    func didReceiveMessage(_ message: MchatMessage) {
         
         
         // Check if sender is blocked (for both private and public messages)
@@ -2863,10 +2868,10 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
                                   (message.content.contains("🫂") || message.content.contains("🐟") || 
                                    message.content.contains("took a screenshot"))
             
-            let finalMessage: BitchatMessage
+            let finalMessage: MchatMessage
             if isActionMessage {
                 // Convert to system message
-                finalMessage = BitchatMessage(
+                finalMessage = MchatMessage(
                     sender: "system",
                     content: String(message.content.dropFirst(2).dropLast(2)), // Remove * * wrapper
                     timestamp: message.timestamp,
@@ -2875,7 +2880,9 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
                     isPrivate: false,
                     recipientNickname: message.recipientNickname,
                     senderPeerID: message.senderPeerID,
-                    mentions: message.mentions
+                    mentions: message.mentions,
+                    deliveryStatus: message.deliveryStatus,
+                    conversationId: message.conversationId
                 )
             } else {
                 finalMessage = message
@@ -3022,7 +3029,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Room Message Handling
     
     /// Handle room/conversation messages with conversation ID routing
-    func didReceiveRoomMessage(_ message: BitchatMessage, in conversationId: Data) {
+    func didReceiveRoomMessage(_ message: MchatMessage, in conversationId: Data) {
         // Check if sender is blocked
         if let senderPeerID = message.senderPeerID {
             if isPeerBlocked(senderPeerID) {
@@ -3170,7 +3177,7 @@ class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     /// Get messages for a specific conversation
-    func getMessagesForConversation(_ conversationId: Data) -> [BitchatMessage] {
+    func getMessagesForConversation(_ conversationId: Data) -> [MchatMessage] {
         return joinedConversations[conversationId] ?? []
     }
     

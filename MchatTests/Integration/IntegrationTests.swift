@@ -1,6 +1,6 @@
 //
 // IntegrationTests.swift
-// bitchatTests
+// MchatTests     
 //
 // This is free and unencumbered software released into the public domain.
 // For more information, see <https://unlicense.org>
@@ -687,7 +687,7 @@ final class IntegrationTests: XCTestCase {
         // Setup encryption at Alice
         nodes["Alice"]!.packetDeliveryHandler = { packet in
             if packet.type == 0x01,
-               let message = BitchatMessage.fromBinaryPayload(packet.payload),
+               let message = MchatMessage.fromBinaryPayload(packet.payload),
                message.isPrivate && packet.recipientID != nil {
                 // Encrypt private messages
                 if let encrypted = try? self.noiseManagers["Alice"]!.encrypt(packet.payload, for: TestConstants.testPeerID2) {
@@ -709,7 +709,7 @@ final class IntegrationTests: XCTestCase {
         nodes["Bob"]!.packetDeliveryHandler = { packet in
             if packet.type == 0x02 {
                 if let decrypted = try? self.noiseManagers["Bob"]!.decrypt(packet.payload, from: TestConstants.testPeerID1),
-                   let message = BitchatMessage.fromBinaryPayload(decrypted) {
+                   let message = MchatMessage.fromBinaryPayload(decrypted) {
                     bobDecrypted = message.content == "Secret message"
                     expectation.fulfill()
                 }
@@ -756,14 +756,14 @@ final class IntegrationTests: XCTestCase {
     
     private func connect(_ node1: String, _ node2: String) {
         guard let n1 = nodes[node1], let n2 = nodes[node2] else { return }
-        n1.simulateConnectedPeer(n2.peerID)
-        n2.simulateConnectedPeer(n1.peerID)
+        n1.simulateConnectedPeer(n2.myPeerID)
+        n2.simulateConnectedPeer(n1.myPeerID)
     }
     
     private func disconnect(_ node1: String, _ node2: String) {
         guard let n1 = nodes[node1], let n2 = nodes[node2] else { return }
-        n1.simulateDisconnectedPeer(n2.peerID)
-        n2.simulateDisconnectedPeer(n1.peerID)
+        n1.simulateDisconnectedPeer(n2.myPeerID)
+        n2.simulateDisconnectedPeer(n1.myPeerID)
     }
     
     private func connectFullMesh() {
@@ -781,10 +781,10 @@ final class IntegrationTests: XCTestCase {
         node.packetDeliveryHandler = { packet in
             guard packet.ttl > 1 else { return }
             
-            if let message = BitchatMessage.fromBinaryPayload(packet.payload) {
-                guard message.senderPeerID != node.peerID else { return }
+            if let message = MchatMessage.fromBinaryPayload(packet.payload) {
+                guard message.senderPeerID != node.myPeerID else { return }
                 
-                let relayMessage = BitchatMessage(
+                let relayMessage = MchatMessage(
                     id: message.id,
                     sender: message.sender,
                     content: message.content,
@@ -819,8 +819,8 @@ final class IntegrationTests: XCTestCase {
     private func establishNoiseSession(_ node1: String, _ node2: String) throws {
         guard let manager1 = noiseManagers[node1],
               let manager2 = noiseManagers[node2],
-              let peer1ID = nodes[node1]?.peerID,
-              let peer2ID = nodes[node2]?.peerID else { return }
+              let peer1ID = nodes[node1]?.myPeerID,
+              let peer2ID = nodes[node2]?.myPeerID else { return }
         
         let msg1 = try manager1.initiateHandshake(with: peer2ID)
         let msg2 = try manager2.handleIncomingHandshake(from: peer1ID, message: msg1)!

@@ -24,7 +24,9 @@ This document briefs contributors and AI agents on what **Mchat** is, why it exi
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                UI Layer                                 │
-│      Home (Announcements, Favorites), Subnet List, Room / DM Views      │
+│               Home(General (campus-wide chat),
+          Broadcast (Annoucments board), Favorites), 
+                   Subchat List, Room / DM Views                          │
 └─────────────────────────────────────────────────────────────────────────┘
                                    │
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -34,17 +36,17 @@ This document briefs contributors and AI agents on what **Mchat** is, why it exi
 └─────────────────────────────────────────────────────────────────────────┘
                                    │
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Security & Identity Layer                        │
+│                         Security & Identity Layer                       │
 │  NoiseEncryptionService (DMs) • Device Key Mgmt • Membership Credential │
 └─────────────────────────────────────────────────────────────────────────┘
                                    │
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Protocol / Message Layer                         │
+│                         Protocol / Message Layer                        │
 │     MchatProtocol (binary frames: room msg, presence, DM, control)      │
 └─────────────────────────────────────────────────────────────────────────┘
                                    │
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Bluetooth Transport Layer                        │
+│                         Bluetooth Transport Layer                       │
 │                    MeshService (BLE advertise / scan / connect)         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
