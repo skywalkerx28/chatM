@@ -11,23 +11,8 @@ final class CredentialVerifier {
     static let shared = CredentialVerifier()
     private init() {}
     
-    // Test mode flag for mocking JWT verification
-    var testMode = false
-    
     func verifyJWT(_ jwt: String, region: String, userPoolId: String) async -> CampusCredential? {
-        // Test mode: skip signature verification for mocks
-        if testMode {
-            let parts = jwt.split(separator: ".").map(String.init)
-            guard parts.count == 3,
-                  let payloadData = base64urlDecode(parts[1]),
-                  let payload = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
-                  let sub = payload["sub"] as? String,
-                  let campusId = payload["campus_id"] as? String,
-                  let exp = payload["exp"] as? Double else { return nil }
-            return CampusCredential(userId: sub, campusId: campusId, exp: Date(timeIntervalSince1970: exp))
-        }
-        
-        // Production mode: full verification
+        // Full JWT verification for production
         let parts = jwt.split(separator: ".").map(String.init)
         guard parts.count == 3,
               let headerData = base64urlDecode(parts[0]),

@@ -7812,7 +7812,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             await campusGate.markAttestationFailed(for: senderID)
             return
         }
-        CampusGateConfig.Metrics.jwtVerifications += 1
+        CampusGate.Metrics.jwtVerifications += 1
         
         // Optional PoP verification
         if let nonce = msg.nonce, let popSig = msg.popSig {
@@ -7824,7 +7824,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
                 await campusGate.markAttestationFailed(for: senderID)
                 return
             }
-            CampusGateConfig.Metrics.popVerifications += 1
+            CampusGate.Metrics.popVerifications += 1
         }
         
         let campusPrefix16 = TopicManager.campusPrefix16(campusId: cred.campusId)

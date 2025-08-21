@@ -1,5 +1,42 @@
 import Foundation
 
+// MARK: - Configuration
+
+/// Configuration and metrics for CampusGate
+extension CampusGate {
+    struct Config {
+        static let neighborCacheSize = 256
+        static let globalCacheSize = 8192
+        static let negativeCacheTTL: TimeInterval = 60.0
+        static let maxCredentialAge: TimeInterval = 1800.0 // 30 minutes
+        static let attestationRequestInterval: TimeInterval = 30.0
+        static let pruneInterval: TimeInterval = 150.0 // 2.5 minutes
+    }
+    
+    struct Metrics {
+        static var jwtVerifications = 0
+        static var popVerifications = 0
+        static var cacheHits = 0
+        static var cacheMisses = 0
+        static var attestationRequests = 0
+        static var attestationDenials = 0
+        
+        static func reset() {
+            jwtVerifications = 0
+            popVerifications = 0
+            cacheHits = 0
+            cacheMisses = 0
+            attestationRequests = 0
+            attestationDenials = 0
+        }
+        
+        static func logStats() {
+            SecureLogger.log("CampusGate Metrics - JWT:\(jwtVerifications) PoP:\(popVerifications) Hits:\(cacheHits) Miss:\(cacheMisses) Req:\(attestationRequests) Deny:\(attestationDenials)", 
+                           category: SecureLogger.session, level: .info)
+        }
+    }
+}
+
 // MARK: - Cache Entry
 
 struct AttestationCacheEntry {
@@ -48,10 +85,10 @@ actor CampusGate {
     // Rate limiting
     private var requestLimiter = AttestationRequestLimiter()
     
-    // Configuration
-    private let neighborCacheSize = 256
-    private let globalCacheSize = 8192
-    private let negativeCacheTTL: TimeInterval = 60.0
+    // Use configuration from nested struct
+    private var neighborCacheSize: Int { Config.neighborCacheSize }
+    private var globalCacheSize: Int { Config.globalCacheSize }
+    private var negativeCacheTTL: TimeInterval { Config.negativeCacheTTL }
     
     // Timer for periodic cleanup
     private var pruneTimer: Timer?
@@ -99,7 +136,7 @@ actor CampusGate {
             if !entry.isExpired && entry.campusPrefix16 == conversationPrefix {
                 entry.lastAccessAt = Date()
                 neighborCache[senderPeerID] = entry
-                CampusGateConfig.Metrics.cacheHits += 1
+                Metrics.cacheHits += 1
                 return true
             } else if entry.isExpired {
                 neighborCache.removeValue(forKey: senderPeerID)
@@ -111,14 +148,14 @@ actor CampusGate {
             if !entry.isExpired && entry.campusPrefix16 == conversationPrefix {
                 entry.lastAccessAt = Date()
                 globalCache[senderPeerID] = entry
-                CampusGateConfig.Metrics.cacheHits += 1
+                Metrics.cacheHits += 1
                 return true
             } else if entry.isExpired {
                 globalCache.removeValue(forKey: senderPeerID)
             }
         }
         
-        CampusGateConfig.Metrics.cacheMisses += 1
+        Metrics.cacheMisses += 1
         return false
     }
     
@@ -135,7 +172,7 @@ actor CampusGate {
         
         let canRequest = requestLimiter.canRequest(for: peerID)
         if canRequest {
-            CampusGateConfig.Metrics.attestationRequests += 1
+            Metrics.attestationRequests += 1
         }
         return canRequest
     }
@@ -143,7 +180,7 @@ actor CampusGate {
     /// Mark attestation request as failed (negative cache)
     func markAttestationFailed(for peerID: String) {
         negativeCache[peerID] = Date()
-        CampusGateConfig.Metrics.attestationDenials += 1
+        Metrics.attestationDenials += 1
     }
     
     /// Promote peer to neighbor cache (on connect)

@@ -22,8 +22,7 @@ final class UnifiedProtocolE2ETests: XCTestCase {
     override func setUp() {
         super.setUp()
         
-        // Enable test mode for JWT verification
-        CredentialVerifier.shared.testMode = true
+        // Use mock credential verifier for tests
         
         // Create mock services with unified protocol support
         alice = createMockService(peerID: TestConstants.testPeerID1, nickname: TestConstants.testNickname1)
@@ -39,8 +38,6 @@ final class UnifiedProtocolE2ETests: XCTestCase {
     }
     
     override func tearDown() {
-        // Disable test mode
-        CredentialVerifier.shared.testMode = false
         
         alice = nil
         bob = nil

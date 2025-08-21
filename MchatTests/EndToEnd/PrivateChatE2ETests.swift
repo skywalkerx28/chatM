@@ -33,9 +33,6 @@ final class PrivateChatE2ETests: XCTestCase {
         retryService.meshService = alice
         retryService.connectivityProvider = alice
         
-        // Enable test mode for JWT verification
-        CredentialVerifier.shared.testMode = true
-        
         // Setup JWT credentials for testing (mock valid campus credentials)
         alice.setupMockCredential(campusId: "mcgill", userId: "alice123")
         bob.setupMockCredential(campusId: "mcgill", userId: "bob456")
@@ -47,8 +44,6 @@ final class PrivateChatE2ETests: XCTestCase {
     }
     
     override func tearDown() {
-        // Disable test mode
-        CredentialVerifier.shared.testMode = false
         
         alice = nil
         bob = nil
