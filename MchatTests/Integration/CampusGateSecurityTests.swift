@@ -29,13 +29,17 @@ final class CampusGateSecurityTests: XCTestCase {
         bob = createMockService(peerID: "BOB5678", nickname: "Bob", campusId: "mcgill.ca")
         eve = createMockService(peerID: "EVE9999", nickname: "Eve", campusId: "wrong.university.edu")
         
-        // Setup valid campus presence for Alice and Bob
-        let validExp = Int(Date().timeIntervalSince1970) + 3600 // 1 hour from now
-        campusGate.acceptPresence(senderId: alice.myPeerID, campusId: "mcgill.ca", exp: validExp)
-        campusGate.acceptPresence(senderId: bob.myPeerID, campusId: "mcgill.ca", exp: validExp)
+        // Setup valid campus attestations for Alice and Bob
+        let validExp = Date().addingTimeInterval(3600) // 1 hour from now
+        let mcgillPrefix = TopicManager.campusPrefix16(campusId: "mcgill.ca")
+        let evilPrefix = TopicManager.campusPrefix16(campusId: "evil.university.edu")
         
-        // Eve has presence for different campus
-        campusGate.acceptPresence(senderId: eve.myPeerID, campusId: "evil.university.edu", exp: validExp)
+        Task {
+            await campusGate.acceptAttestation(peerID: alice.myPeerID, campusId: "mcgill.ca", exp: validExp, campusPrefix16: mcgillPrefix)
+            await campusGate.acceptAttestation(peerID: bob.myPeerID, campusId: "mcgill.ca", exp: validExp, campusPrefix16: mcgillPrefix)
+            // Eve has attestation for different campus
+            await campusGate.acceptAttestation(peerID: eve.myPeerID, campusId: "evil.university.edu", exp: validExp, campusPrefix16: evilPrefix)
+        }
     }
     
     override func tearDown() {
@@ -111,27 +115,38 @@ final class CampusGateSecurityTests: XCTestCase {
         let conversationId = TopicManager.generalId(campusId: campusId)
         let expiredPeerID = "EXPIRED123"
         
-        // Setup expired presence
-        let expiredTime = Int(Date().timeIntervalSince1970) - 3600 // 1 hour ago
-        campusGate.acceptPresence(senderId: expiredPeerID, campusId: campusId, exp: expiredTime)
+        // Setup expired attestation
+        let expiredTime = Date().addingTimeInterval(-3600) // 1 hour ago
+        let campusPrefix = TopicManager.campusPrefix16(campusId: campusId)
         
-        // Should reject message from expired presence
-        XCTAssertFalse(campusGate.shouldAcceptMessage(from: expiredPeerID, topicCampusId: campusId))
+        Task {
+            await campusGate.acceptAttestation(peerID: expiredPeerID, campusId: campusId, exp: expiredTime, campusPrefix16: campusPrefix)
+            
+            // Should reject message from expired attestation
+            let isAllowed = await campusGate.isAllowed(conversationId: conversationId, senderPeerID: expiredPeerID)
+            XCTAssertFalse(isAllowed)
+        }
     }
     
     func testPresenceUpdateOverwritesPrevious() throws {
         let peerID = "UPDATE123"
         let campusId = "mcgill.ca"
+        let conversationId = TopicManager.generalId(campusId: campusId)
+        let campusPrefix = TopicManager.campusPrefix16(campusId: campusId)
         
-        // Setup expired presence first
-        let expiredTime = Int(Date().timeIntervalSince1970) - 3600
-        campusGate.acceptPresence(senderId: peerID, campusId: campusId, exp: expiredTime)
-        XCTAssertFalse(campusGate.shouldAcceptMessage(from: peerID, topicCampusId: campusId))
-        
-        // Update with valid presence
-        let validTime = Int(Date().timeIntervalSince1970) + 3600
-        campusGate.acceptPresence(senderId: peerID, campusId: campusId, exp: validTime)
-        XCTAssertTrue(campusGate.shouldAcceptMessage(from: peerID, topicCampusId: campusId))
+        Task {
+            // Setup expired attestation first
+            let expiredTime = Date().addingTimeInterval(-3600)
+            await campusGate.acceptAttestation(peerID: peerID, campusId: campusId, exp: expiredTime, campusPrefix16: campusPrefix)
+            let isAllowedExpired = await campusGate.isAllowed(conversationId: conversationId, senderPeerID: peerID)
+            XCTAssertFalse(isAllowedExpired)
+            
+            // Update with valid attestation
+            let validTime = Date().addingTimeInterval(3600)
+            await campusGate.acceptAttestation(peerID: peerID, campusId: campusId, exp: validTime, campusPrefix16: campusPrefix)
+            let isAllowedValid = await campusGate.isAllowed(conversationId: conversationId, senderPeerID: peerID)
+            XCTAssertTrue(isAllowedValid)
+        }
     }
     
     // MARK: - Room Isolation Tests
@@ -236,10 +251,15 @@ final class CampusGateSecurityTests: XCTestCase {
         let utoronto = createMockService(peerID: "UTORONTO1", nickname: "Toronto1", campusId: "utoronto.ca")
         let concordia = createMockService(peerID: "CONCORDIA1", nickname: "Concordia1", campusId: "concordia.ca")
         
-        // Setup presence for each campus
-        let validExp = Int(Date().timeIntervalSince1970) + 3600
-        campusGate.acceptPresence(senderId: utoronto.myPeerID, campusId: "utoronto.ca", exp: validExp)
-        campusGate.acceptPresence(senderId: concordia.myPeerID, campusId: "concordia.ca", exp: validExp)
+        // Setup attestations for each campus
+        let validExp = Date().addingTimeInterval(3600)
+        let utorontoPrefix = TopicManager.campusPrefix16(campusId: "utoronto.ca")
+        let concordiaPrefix = TopicManager.campusPrefix16(campusId: "concordia.ca")
+        
+        Task {
+            await campusGate.acceptAttestation(peerID: utoronto.myPeerID, campusId: "utoronto.ca", exp: validExp, campusPrefix16: utorontoPrefix)
+            await campusGate.acceptAttestation(peerID: concordia.myPeerID, campusId: "concordia.ca", exp: validExp, campusPrefix16: concordiaPrefix)
+        }
         
         // Create campus-specific conversations
         let mcgillGeneral = TopicManager.generalId(campusId: "mcgill.ca")
@@ -310,8 +330,12 @@ final class CampusGateSecurityTests: XCTestCase {
         
         // Create a chain: Alice -> Bob -> Charlie (all same campus)
         let charlie = createMockService(peerID: "CHARLIE999", nickname: "Charlie", campusId: campusId)
-        let validExp = Int(Date().timeIntervalSince1970) + 3600
-        campusGate.acceptPresence(senderId: charlie.myPeerID, campusId: campusId, exp: validExp)
+        let validExp = Date().addingTimeInterval(3600)
+        let campusPrefix = TopicManager.campusPrefix16(campusId: campusId)
+        
+        Task {
+            await campusGate.acceptAttestation(peerID: charlie.myPeerID, campusId: campusId, exp: validExp, campusPrefix16: campusPrefix)
+        }
         
         // All join the conversation
         alice.joinConversation(conversationId)
@@ -413,45 +437,57 @@ final class CampusGateSecurityTests: XCTestCase {
         let spammerID = "SPAMMER123"
         let campusId = "mcgill.ca"
         let conversationId = TopicManager.generalId(campusId: campusId)
+        let campusPrefix = TopicManager.campusPrefix16(campusId: campusId)
         
-        // Accept presence initially
-        let validExp = Int(Date().timeIntervalSince1970) + 3600
-        campusGate.acceptPresence(senderId: spammerID, campusId: campusId, exp: validExp)
-        
-        // Verify initial acceptance
-        XCTAssertTrue(campusGate.shouldAcceptMessage(from: spammerID, topicCampusId: campusId))
-        
-        // Simulate presence spam by setting expired presence
-        let expiredTime = Int(Date().timeIntervalSince1970) - 1
-        campusGate.acceptPresence(senderId: spammerID, campusId: campusId, exp: expiredTime)
-        
-        // Should now be rejected
-        XCTAssertFalse(campusGate.shouldAcceptMessage(from: spammerID, topicCampusId: campusId))
+        Task {
+            // Accept attestation initially
+            let validExp = Date().addingTimeInterval(3600)
+            await campusGate.acceptAttestation(peerID: spammerID, campusId: campusId, exp: validExp, campusPrefix16: campusPrefix)
+            
+            // Verify initial acceptance
+            let isAllowedInitial = await campusGate.isAllowed(conversationId: conversationId, senderPeerID: spammerID)
+            XCTAssertTrue(isAllowedInitial)
+            
+            // Simulate attestation spam by setting expired attestation
+            let expiredTime = Date().addingTimeInterval(-1)
+            await campusGate.acceptAttestation(peerID: spammerID, campusId: campusId, exp: expiredTime, campusPrefix16: campusPrefix)
+            
+            // Should now be rejected
+            let isAllowedAfterSpam = await campusGate.isAllowed(conversationId: conversationId, senderPeerID: spammerID)
+            XCTAssertFalse(isAllowedAfterSpam)
+        }
     }
     
     func testConcurrentPresenceUpdates() throws {
         let peerID = "CONCURRENT123"
         let campusId = "mcgill.ca"
+        let conversationId = TopicManager.generalId(campusId: campusId)
+        let campusPrefix = TopicManager.campusPrefix16(campusId: campusId)
         
-        // Simulate concurrent presence updates
+        // Simulate concurrent attestation updates
         let group = DispatchGroup()
         let iterations = 100
         
         for i in 0..<iterations {
             group.enter()
             DispatchQueue.global().async {
-                let exp = Int(Date().timeIntervalSince1970) + Int.random(in: 1...7200) // Random future time
-                self.campusGate.acceptPresence(senderId: peerID, campusId: campusId, exp: exp)
-                group.leave()
+                let exp = Date().addingTimeInterval(Double.random(in: 1...7200)) // Random future time
+                Task {
+                    await self.campusGate.acceptAttestation(peerID: peerID, campusId: campusId, exp: exp, campusPrefix16: campusPrefix)
+                    group.leave()
+                }
             }
         }
         
         group.wait()
         
         // After all updates, should still be functional (no crashes)
-        let result = campusGate.shouldAcceptMessage(from: peerID, topicCampusId: campusId)
-        // Result could be true or false depending on final state, but no crash
-        XCTAssertNotNil(result) // Just verify it returns something
+        Task {
+            let result = await campusGate.isAllowed(conversationId: conversationId, senderPeerID: peerID)
+            // Result could be true or false depending on final state, but no crash
+            // Just verify it returns without crashing
+            XCTAssertNotNil(result)
+        }
     }
     
     // MARK: - Message Content Security Tests

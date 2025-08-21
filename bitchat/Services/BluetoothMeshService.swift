@@ -5509,6 +5509,7 @@ extension BluetoothMeshService: CBPeripheralDelegate {
         }
     }
 }
+
 extension BluetoothMeshService: CBPeripheralManagerDelegate {
     // MARK: - CBPeripheralManagerDelegate
     
