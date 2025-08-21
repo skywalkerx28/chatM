@@ -18,10 +18,11 @@ extension Data {
     }
     
     init?(hexString: String) {
+        guard hexString.count % 2 == 0 else { return nil }
         let len = hexString.count / 2
         var data = Data(capacity: len)
         var index = hexString.startIndex
-        
+
         for _ in 0..<len {
             let nextIndex = hexString.index(index, offsetBy: 2)
             guard let byte = UInt8(String(hexString[index..<nextIndex]), radix: 16) else {
@@ -30,7 +31,7 @@ extension Data {
             data.append(byte)
             index = nextIndex
         }
-        
+
         self = data
     }
 }
