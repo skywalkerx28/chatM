@@ -242,7 +242,8 @@ actor CampusGate {
     }
     
     private func startPruneTimer() {
-        pruneTimer = Timer.scheduledTimer(withTimeInterval: 150.0, repeats: true) { [weak self] _ in
+        // Schedule pruning using Config.pruneInterval
+        pruneTimer = Timer.scheduledTimer(withTimeInterval: Config.pruneInterval, repeats: true) { [weak self] _ in
             Task { [weak self] in
                 await self?.prune()
             }
