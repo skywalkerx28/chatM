@@ -21,17 +21,29 @@ final class PublicChatE2ETests: XCTestCase {
     override func setUp() {
         super.setUp()
         
+        // Enable test mode for JWT verification
+        CredentialVerifier.shared.testMode = true
+        
         // Create mock services
         alice = createMockService(peerID: TestConstants.testPeerID1, nickname: TestConstants.testNickname1)
         bob = createMockService(peerID: TestConstants.testPeerID2, nickname: TestConstants.testNickname2)
         charlie = createMockService(peerID: TestConstants.testPeerID3, nickname: TestConstants.testNickname3)
         david = createMockService(peerID: TestConstants.testPeerID4, nickname: TestConstants.testNickname4)
         
+        // Setup JWT credentials for testing
+        alice.setupMockCredential(campusId: "mcgill", userId: "alice123")
+        bob.setupMockCredential(campusId: "mcgill", userId: "bob456")
+        charlie.setupMockCredential(campusId: "mcgill", userId: "charlie789")
+        david.setupMockCredential(campusId: "mcgill", userId: "david012")
+        
         // Clear received messages
         receivedMessages.removeAll()
     }
     
     override func tearDown() {
+        // Disable test mode
+        CredentialVerifier.shared.testMode = false
+        
         alice = nil
         bob = nil
         charlie = nil

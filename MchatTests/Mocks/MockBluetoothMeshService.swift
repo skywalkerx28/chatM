@@ -320,6 +320,30 @@ class MockBluetoothMeshService: BluetoothMeshService, ConnectivityProvider {
         return connectedPeerIDs
     }
     
+    // Setup mock JWT credential for testing
+    func setupMockCredential(campusId: String, userId: String) {
+        // Create mock JWT payload
+        let payload = [
+            "sub": userId,
+            "campus_id": campusId,
+            "exp": Int(Date().addingTimeInterval(3600).timeIntervalSince1970) // 1 hour from now
+        ]
+        let payloadData = try! JSONSerialization.data(withJSONObject: payload)
+        let payloadBase64 = payloadData.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        
+        // Mock JWT (header.payload.signature)
+        let mockJWT = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.\(payloadBase64).mock_signature"
+        
+        // Store in keychain for this mock
+        _ = KeychainManager.shared.save(mockJWT, forKey: "auth_id_token")
+        
+        // Set campus for this mock
+        self.campusId = campusId
+    }
+    
     /// Automatic relay logic for room messages when no explicit packetDeliveryHandler is set
     private func performAutomaticRoomMessageRelay(_ packet: BitchatPacket) {
         // Check if should relay (TTL > 1)

@@ -99,6 +99,7 @@ actor CampusGate {
             if !entry.isExpired && entry.campusPrefix16 == conversationPrefix {
                 entry.lastAccessAt = Date()
                 neighborCache[senderPeerID] = entry
+                CampusGateConfig.Metrics.cacheHits += 1
                 return true
             } else if entry.isExpired {
                 neighborCache.removeValue(forKey: senderPeerID)
@@ -110,12 +111,14 @@ actor CampusGate {
             if !entry.isExpired && entry.campusPrefix16 == conversationPrefix {
                 entry.lastAccessAt = Date()
                 globalCache[senderPeerID] = entry
+                CampusGateConfig.Metrics.cacheHits += 1
                 return true
             } else if entry.isExpired {
                 globalCache.removeValue(forKey: senderPeerID)
             }
         }
         
+        CampusGateConfig.Metrics.cacheMisses += 1
         return false
     }
     
@@ -130,12 +133,17 @@ actor CampusGate {
             }
         }
         
-        return requestLimiter.canRequest(for: peerID)
+        let canRequest = requestLimiter.canRequest(for: peerID)
+        if canRequest {
+            CampusGateConfig.Metrics.attestationRequests += 1
+        }
+        return canRequest
     }
     
     /// Mark attestation request as failed (negative cache)
     func markAttestationFailed(for peerID: String) {
         negativeCache[peerID] = Date()
+        CampusGateConfig.Metrics.attestationDenials += 1
     }
     
     /// Promote peer to neighbor cache (on connect)
