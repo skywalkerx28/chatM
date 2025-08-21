@@ -17,6 +17,8 @@ class MockBluetoothMeshService: BluetoothMeshService, ConnectivityProvider {
     var messageDeliveryHandler: ((MchatMessage) -> Void)?
     var packetDeliveryHandler: ((BitchatPacket) -> Void)?
     var roomMessageDeliveryHandler: ((RoomMessage) -> Void)?
+    var credentialHandler: ((CampusCredentialMessage) -> Void)?
+    var attestationRequestHandler: ((AttestationRequest) -> Void)?
     
     // Static registry to allow peers to find each other
     private static var serviceRegistry: [String: MockBluetoothMeshService] = [:]
@@ -198,7 +200,17 @@ class MockBluetoothMeshService: BluetoothMeshService, ConnectivityProvider {
         // It should trigger both message delivery and packet handling for relay
         
         // Handle different packet types
-        if packet.type == MessageType.roomMessage.rawValue {
+        if packet.type == MessageType.campusAttestation.rawValue {
+            // Handle campus credential message
+            if let credMsg = CampusCredentialMessage.fromBinaryData(packet.payload) {
+                self.credentialHandler?(credMsg)
+            }
+        } else if packet.type == MessageType.attestationRequest.rawValue {
+            // Handle attestation request
+            if let req = AttestationRequest.fromBinaryData(packet.payload) {
+                self.attestationRequestHandler?(req)
+            }
+        } else if packet.type == MessageType.roomMessage.rawValue {
             // Handle room message
             if let roomMessage = RoomMessage.decode(from: packet.payload) {
                 // Check if we should accept this room message

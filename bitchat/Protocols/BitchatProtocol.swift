@@ -172,6 +172,8 @@ enum MessageType: UInt8 {
     case noiseEncrypted = 0x12         // Noise encrypted transport message
     case noiseIdentityAnnounce = 0x13  // Announce static public key for discovery
     case roomMessage = 0x14            // Channel message with conversation ID
+    case campusAttestation = 0x15      // Campus membership attestation
+    case attestationRequest = 0x16     // Request campus attestation
     
     // Protocol-level acknowledgments
     case protocolAck = 0x22             // Generic protocol acknowledgment
@@ -199,6 +201,8 @@ enum MessageType: UInt8 {
         case .noiseEncrypted: return "noiseEncrypted"
         case .noiseIdentityAnnounce: return "noiseIdentityAnnounce"
         case .roomMessage: return "roomMessage"
+        case .campusAttestation: return "campusAttestation"
+        case .attestationRequest: return "attestationRequest"
         case .protocolAck: return "protocolAck"
         case .protocolNack: return "protocolNack"
         case .systemValidation: return "systemValidation"
@@ -914,6 +918,46 @@ struct NoiseIdentityAnnouncement: Codable {
     }
 }
 
+/// Request for campus attestation
+struct AttestationRequest: Codable {
+    let nonce: UInt32              // Request nonce
+    let requesterPeerID: String    // Who is requesting
+    let timestamp: UInt64          // Request timestamp
+    
+    init(requesterPeerID: String) {
+        self.nonce = UInt32.random(in: 0...UInt32.max)
+        self.requesterPeerID = requesterPeerID
+        self.timestamp = UInt64(Date().timeIntervalSince1970)
+    }
+    
+    // Binary encoding
+    func toBinaryData() -> Data {
+        var data = Data()
+        data.appendUInt32(nonce)
+        data.appendString(requesterPeerID)
+        data.appendUInt64(timestamp)
+        return data
+    }
+    
+    static func fromBinaryData(_ data: Data) -> AttestationRequest? {
+        let dataCopy = Data(data)
+        guard dataCopy.count >= 8 else { return nil }
+        
+        var offset = 0
+        guard let nonce = dataCopy.readUInt32(at: &offset),
+              let requesterPeerID = dataCopy.readString(at: &offset),
+              let timestamp = dataCopy.readUInt64(at: &offset) else { return nil }
+        
+        return AttestationRequest(nonce: nonce, requesterPeerID: requesterPeerID, timestamp: timestamp)
+    }
+    
+    private init(nonce: UInt32, requesterPeerID: String, timestamp: UInt64) {
+        self.nonce = nonce
+        self.requesterPeerID = requesterPeerID
+        self.timestamp = timestamp
+    }
+}
+
 // Binding between ephemeral peer ID and cryptographic identity
 struct PeerIdentityBinding {
     let currentPeerID: String        // Current ephemeral ID
@@ -1131,5 +1175,42 @@ extension BitchatDelegate {
     
     func peerAvailabilityChanged(_ peerID: String, available: Bool) {
         // Default empty implementation
+    }
+}
+
+// MARK: - Campus Credential (JWT + PoP)
+
+/// Compact credential carrying a JWT (Cognito ID token) and optional device PoP
+struct CampusCredentialMessage {
+    let jwt: String                 // Cognito ID token (base64url JWT)
+    let devicePubEd25519: Data      // 32-byte device Ed25519 public key
+    let nonce: UInt32?              // Echoed request nonce (for PoP)
+    let popSig: Data?               // Device Ed25519 signature over challenge
+    
+    func toBinaryData() -> Data {
+        var data = Data()
+        data.appendString(jwt, maxLength: 65535)
+        data.appendData(devicePubEd25519)
+        if let nonce = nonce, let popSig = popSig {
+            data.appendUInt32(nonce)
+            data.appendData(popSig)
+        }
+        return data
+    }
+    
+    static func fromBinaryData(_ data: Data) -> CampusCredentialMessage? {
+        let copy = Data(data)
+        var offset = 0
+        guard let jwt = copy.readString(at: &offset, maxLength: 65535),
+              let devicePub = copy.readData(at: &offset) else { return nil }
+        var nonce: UInt32? = nil
+        var pop: Data? = nil
+        if offset < copy.count {
+            if let n = copy.readUInt32(at: &offset), let ps = copy.readData(at: &offset) {
+                nonce = n
+                pop = ps
+            }
+        }
+        return CampusCredentialMessage(jwt: jwt, devicePubEd25519: devicePub, nonce: nonce, popSig: pop)
     }
 }

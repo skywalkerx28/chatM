@@ -743,7 +743,6 @@ class BluetoothMeshService: NSObject {
     private var relayProbability: Double = 1.0  // Start at 100%, decrease with peer count
     private let minRelayProbability: Double = 0.4  // Minimum 40% relay chance - ensures coverage
     
-    
     // MARK: - Bloom Filter
     
     // Optimized Bloom filter for efficient duplicate detection
@@ -772,7 +771,6 @@ class BluetoothMeshService: NSObject {
             return result
         }
     }
-    
     // Dynamic connection limit calculation based on network size and battery mode
     private func calculateDynamicConnectionLimit() -> Int {
         let powerMode = batteryOptimizer.currentPowerMode
@@ -1412,7 +1410,6 @@ class BluetoothMeshService: NSObject {
     func unlockRotation() {
         rotationLocked = false
     }
-    
     // MARK: - Initialization
     
     override init() {
@@ -1871,20 +1868,7 @@ class BluetoothMeshService: NSObject {
             
             // Every 20s: Connection keep-alive
             self.sendKeepAlivePings()
-            // Every 20s: Publish presence if we have campus credential
-            if let presence = MembershipCredentialManager.shared.presenceBlob() {
-                // Reuse broadcast path; presence is a small JSON blob
-                let packet = BitchatPacket(
-                    type: MessageType.roomMessage.rawValue,
-                    senderID: Data(hexString: self.myPeerID) ?? Data(),
-                    recipientID: SpecialRecipients.broadcast,
-                    timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
-                    payload: presence,
-                    signature: nil,
-                    ttl: self.adaptiveTTL
-                )
-                self.broadcastPacket(packet)
-            }
+            // Note: Presence broadcasting removed - now using on-demand attestation
             
             // Every 20s: Peer availability check
             self.checkPeerAvailability()
@@ -2210,7 +2194,6 @@ class BluetoothMeshService: NSObject {
             }
         }
     }
-    
     /// Sends a message to a specific room/conversation through the mesh network.
     /// - Parameters:
     ///   - content: The message content to send
@@ -2989,9 +2972,6 @@ class BluetoothMeshService: NSObject {
             }
         }
     }
-    
-    
-    
     private func broadcastPacket(_ packet: BitchatPacket) {
         // CRITICAL CHECK: Never send unencrypted JSON
         if packet.type == MessageType.deliveryAck.rawValue {
@@ -3344,15 +3324,7 @@ class BluetoothMeshService: NSObject {
                     // No signature verification - broadcasts are not authenticated
                     
                     // Parse broadcast message (not encrypted)
-                    // First try to parse as presence frame; otherwise treat as chat message
-                    if let presenceObj = try? JSONSerialization.jsonObject(with: packet.payload) as? [String: Any],
-                       let t = presenceObj["t"] as? String, t == "presence" {
-                        if let campusId = presenceObj["campus_id"] as? String,
-                           let cred = presenceObj["credential"] as? [String: Any],
-                           let exp = cred["exp"] as? Int {
-                            self.campusGate.acceptPresence(senderId: senderID, campusId: campusId, exp: exp)
-                        }
-                    } else if let message = BitchatMessage.fromBinaryPayload(packet.payload) {
+                    if let message = BitchatMessage.fromBinaryPayload(packet.payload) {
                         
                         // Store nickname mapping
                         collectionsQueue.sync(flags: .barrier) {
@@ -3390,19 +3362,9 @@ class BluetoothMeshService: NSObject {
                         let peerID = packet.senderID.hexEncodedString()
                         self.lastMessageFromPeer.set(peerID, value: Date())
                         
-                        // Gate by campus presence if profile is available; otherwise allow
-                        if let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id {
-                            if self.campusGate.shouldAcceptMessage(from: senderID, topicCampusId: campusId) {
-                                DispatchQueue.main.async {
-                                    self.delegate?.didReceiveMessage(messageWithPeerID)
-                                }
-                            } else {
-                                // Dropped by CampusGate
-                            }
-                        } else {
-                            DispatchQueue.main.async {
-                                self.delegate?.didReceiveMessage(messageWithPeerID)
-                            }
+                        // Legacy broadcast messages bypass campus gating for now
+                        DispatchQueue.main.async {
+                            self.delegate?.didReceiveMessage(messageWithPeerID)
                         }
                     }
                     
@@ -3588,20 +3550,38 @@ class BluetoothMeshService: NSObject {
                 return
             }
             
-            // Gate by campus presence - require valid campus credential
-            let shouldAcceptMessage: Bool
-            if let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id {
-                shouldAcceptMessage = self.campusGate.shouldAcceptMessage(from: senderID, topicCampusId: campusId)
-            } else {
-                // No profile loaded yet - drop room messages for security
-                shouldAcceptMessage = false
+            // Gate by campus attestation - require valid campus credential
+            Task {
+                let shouldAcceptMessage = await campusGate.isAllowed(
+                    conversationId: roomMessage.conversationId,
+                    senderPeerID: senderID
+                )
+                
+                guard shouldAcceptMessage else {
+                    // Request attestation if needed
+                    if await campusGate.shouldRequestAttestation(for: senderID) {
+                        let request = AttestationRequest(requesterPeerID: self.myPeerID)
+                        let packet = BitchatPacket(
+                            type: MessageType.attestationRequest.rawValue,
+                            senderID: Data(hexString: self.myPeerID) ?? Data(),
+                            recipientID: Data(hexString: senderID),
+                            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+                            payload: request.toBinaryData(),
+                            signature: nil,
+                            ttl: 2
+                        )
+                        _ = self.sendDirectToRecipient(packet, recipientPeerID: senderID)
+                    }
+                    
+                    SecureLogger.log("Dropped room message from \(senderID) - failed CampusGate check", 
+                                   category: SecureLogger.session, level: .info)
+                    return
+                }
+                
+                // Process the room message
+                await self.processValidatedRoomMessage(roomMessage, from: senderID, packet: packet)
             }
-            
-            guard shouldAcceptMessage else {
-                SecureLogger.log("Dropped room message from \(senderID) - failed CampusGate check", 
-                               category: SecureLogger.session, level: .info)
-                return
-            }
+            return // Early return since we're processing async
             
             // Check if we're joined to this conversation (except for announcements)
             let conversationStore = ConversationStore.shared
@@ -3666,6 +3646,28 @@ class BluetoothMeshService: NSObject {
             if relayPacket.ttl > 0 {
                 let delay = self.exponentialRelayDelay()
                 self.scheduleRelay(relayPacket, messageID: messageID, delay: delay)
+            }
+            
+        case .campusAttestation:
+            // Handle campus credential (JWT + optional PoP)
+            let senderID = packet.senderID.hexEncodedString()
+            guard !senderID.isEmpty && senderID != myPeerID else { return }
+            
+            if let credMsg = CampusCredentialMessage.fromBinaryData(packet.payload) {
+                Task {
+                    await handleCampusCredentialMessage(credMsg, from: senderID)
+                }
+            }
+            
+        case .attestationRequest:
+            // Handle request for campus credential
+            let senderID = packet.senderID.hexEncodedString()
+            guard !senderID.isEmpty && senderID != myPeerID else { return }
+            
+            if let request = AttestationRequest.fromBinaryData(packet.payload) {
+                Task {
+                    await handleAttestationRequest(request, from: senderID)
+                }
             }
         // Note: 0x02 was legacy keyExchange - removed
         case .announce:
@@ -4625,110 +4627,21 @@ class BluetoothMeshService: NSObject {
             // Handle room messages (implement or call handler)
             handleRoomMessage(packet: packet, from: peerID)
             
+        case .campusAttestation:
+            // Handle campus attestation message
+            let senderID = packet.senderID.hexEncodedString()
+            if !isPeerIDOurs(senderID) {
+                if let msg = CampusCredentialMessage.from(packet.payload) {
+                    await handleCampusCredentialMessage(msg, from: senderID)
+                }
+            }
+            
         default:
             break
         }
-        }
     }
     
-    // MARK: - Room Message Handler
-    
-    private func handleRoomMessage(packet: BitchatPacket, from peerID: String) {
-        // Handle room/conversation messages
-        let senderID = packet.senderID.hexEncodedString()
-        guard !senderID.isEmpty && senderID != myPeerID else { return }
-        
-        // Room messages are always broadcast
-        guard let recipientID = packet.recipientID,
-              recipientID == SpecialRecipients.broadcast else { return }
-        
-        // Parse room message from binary payload
-        guard let roomMessage = RoomMessage.decode(from: packet.payload) else {
-            SecureLogger.log("Failed to decode room message from \(senderID)", 
-                           category: SecureLogger.session, level: .warning)
-            return
-        }
-        
-        // Gate by campus presence - require valid campus credential
-        let shouldAcceptMessage: Bool
-        if let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id {
-            shouldAcceptMessage = self.campusGate.shouldAcceptMessage(from: senderID, topicCampusId: campusId)
-        } else {
-            // No profile loaded yet - drop room messages for security
-            shouldAcceptMessage = false
-        }
-        
-        guard shouldAcceptMessage else {
-            SecureLogger.log("Dropped room message from \(senderID) - failed CampusGate check", 
-                           category: SecureLogger.session, level: .info)
-            return
-        }
-        
-        // Check if we're joined to this conversation (except for announcements)
-        let conversationStore = ConversationStore.shared
-        let isAnnouncements = roomMessage.conversationId == TopicManager.announcementsId(
-            campusId: MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
-        )
-        
-        if !isAnnouncements && !conversationStore.isJoined(roomMessage.conversationId) {
-            SecureLogger.log("Dropped room message - not joined to conversation", 
-                           category: SecureLogger.session, level: .debug)
-            return
-        }
-        
-        // Store nickname mapping
-        collectionsQueue.sync(flags: .barrier) {
-            if let session = self.peerSessions[senderID] {
-                session.nickname = roomMessage.sender
-            } else {
-                let session = PeerSession(peerID: senderID, nickname: roomMessage.sender)
-                self.peerSessions[senderID] = session
-            }
-        }
-        
-        // Convert RoomMessage to MchatMessage for unified UI handling
-        let mchatMessage = MchatMessage(
-            id: roomMessage.messageId,
-            sender: roomMessage.sender,
-            content: roomMessage.content,
-            timestamp: roomMessage.timestamp,
-            isRelay: false,
-            originalSender: nil,
-            isPrivate: false, // Room messages are not private
-            recipientNickname: nil,
-            senderPeerID: senderID,
-            mentions: roomMessage.mentions,
-            deliveryStatus: nil,
-            conversationId: roomMessage.conversationId  // Include conversation context
-        )
-        
-        // Track last message time from this peer
-        self.lastMessageFromPeer.set(senderID, value: Date())
-        
-        // Update unread count for the conversation
-        Task { @MainActor in
-            conversationStore.incrementUnreadCount(conversationId: roomMessage.conversationId)
-        }
-        
-        // Deliver to UI via delegate
-        DispatchQueue.main.async {
-            // Create a custom delegate method for room messages that includes conversation ID
-            if let chatViewModel = self.delegate as? ChatViewModel {
-                chatViewModel.didReceiveRoomMessage(mchatMessage, in: roomMessage.conversationId)
-            } else {
-                // Fallback to regular message handling if delegate doesn't support room messages yet
-                self.delegate?.didReceiveMessage(mchatMessage)
-            }
-        }
-        
-        // Relay room messages
-        var relayPacket = packet
-        relayPacket.ttl -= 1
-        if relayPacket.ttl > 0 {
-            let delay = self.exponentialRelayDelay()
-            self.scheduleRelay(relayPacket, messageID: generatePacketID(for: packet), delay: delay)
-        }
-    }
+    // MARK: - Room Message Handler (Deprecated - using async JWT-based handler)
     
     private func sendFragmentedPacket(_ packet: BitchatPacket) {
         guard let fullData = packet.toBinaryData() else { return }
@@ -7825,6 +7738,158 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         }
     }
     
+    private func processValidatedRoomMessage(_ roomMessage: RoomMessage, from senderID: String, packet: BitchatPacket) async {
+        // Check if we're joined to this conversation (except for announcements)
+        let conversationStore = ConversationStore.shared
+        let isAnnouncements = roomMessage.conversationId == TopicManager.announcementsId(
+            campusId: MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
+        )
+        
+        if !isAnnouncements && !conversationStore.isJoined(roomMessage.conversationId) {
+            SecureLogger.log("Dropped room message - not joined to conversation", 
+                           category: SecureLogger.session, level: .debug)
+            return
+        }
+        
+        // Store nickname mapping
+        collectionsQueue.sync(flags: .barrier) {
+            if let session = self.peerSessions[senderID] {
+                session.nickname = roomMessage.sender
+            } else {
+                let session = PeerSession(peerID: senderID, nickname: roomMessage.sender)
+                self.peerSessions[senderID] = session
+            }
+        }
+        
+        // Convert RoomMessage to MchatMessage for unified UI handling
+        let mchatMessage = MchatMessage(
+            id: roomMessage.messageId,
+            sender: roomMessage.sender,
+            content: roomMessage.content,
+            timestamp: roomMessage.timestamp,
+            isRelay: false,
+            originalSender: nil,
+            isPrivate: false,
+            recipientNickname: nil,
+            senderPeerID: senderID,
+            mentions: roomMessage.mentions,
+            deliveryStatus: nil,
+            conversationId: roomMessage.conversationId
+        )
+        
+        // Update unread count for the conversation
+        Task { @MainActor in
+            conversationStore.incrementUnreadCount(conversationId: roomMessage.conversationId)
+        }
+        
+        DispatchQueue.main.async {
+            if let chatViewModel = self.delegate as? ChatViewModel {
+                chatViewModel.didReceiveRoomMessage(mchatMessage, in: roomMessage.conversationId)
+            } else {
+                self.delegate?.didReceiveMessage(mchatMessage)
+            }
+        }
+        
+        // Relay room messages
+        var relayPacket = packet
+        relayPacket.ttl -= 1
+        if relayPacket.ttl > 0 {
+            let delay = self.exponentialRelayDelay()
+            self.scheduleRelay(relayPacket, messageID: roomMessage.messageId, delay: delay)
+        }
+    }
+    
+    // MARK: - Campus Attestation Handlers
+    
+    private func handleCampusCredentialMessage(_ msg: CampusCredentialMessage, from senderID: String) async {
+        // Verify JWT offline
+        guard let region = Bundle.main.object(forInfoDictionaryKey: "AWSRegion") as? String,
+              let userPoolId = Bundle.main.object(forInfoDictionaryKey: "CognitoUserPoolId") as? String else {
+            return
+        }
+        guard let cred = await CredentialVerifier.shared.verifyJWT(msg.jwt, region: region, userPoolId: userPoolId) else {
+            SecureLogger.log("Invalid JWT credential from \(senderID)", category: SecureLogger.security, level: .warning)
+            await campusGate.markAttestationFailed(for: senderID)
+            return
+        }
+        
+        // Optional PoP verification
+        if let nonce = msg.nonce, let popSig = msg.popSig {
+            // hash of JWT for binding
+            let jwtHash = Data(SHA256.hash(data: Data(msg.jwt.utf8)))
+            let ok = NoiseEncryptionService().verifySignature(popSig, for: Data("ATT_RESP_V1\nnonce:\(nonce)\natt_sha256:".utf8) + jwtHash + Data("\n".utf8), publicKey: msg.devicePubEd25519)
+            if !ok {
+                SecureLogger.log("Invalid PoP from \(senderID)", category: SecureLogger.security, level: .warning)
+                await campusGate.markAttestationFailed(for: senderID)
+                return
+            }
+        }
+        
+        let campusPrefix16 = TopicManager.campusPrefix16(campusId: cred.campusId)
+        await campusGate.acceptAttestation(peerID: senderID, campusId: cred.campusId, exp: cred.exp, campusPrefix16: campusPrefix16)
+        SecureLogger.log("Accepted campus JWT for \(senderID) campus=\(cred.campusId)", category: SecureLogger.security, level: .debug)
+    }
+    
+    private func sendCampusAttestation(to peerID: String? = nil, requestNonce: UInt32? = nil) async {
+        // Use stored ID token as JWT credential
+        let idToken = KeychainManager.shared.retrieve(forKey: "auth_id_token")
+        guard let jwt = idToken else { return }
+        
+        let devicePub = NoiseEncryptionService().getSigningPublicKeyData()
+        let jwtHash = Data(SHA256.hash(data: Data(jwt.utf8)))
+        var popSig: Data? = nil
+        if let nonce = requestNonce {
+            let challenge = Data("ATT_RESP_V1\nnonce:\(nonce)\natt_sha256:".utf8) + jwtHash + Data("\n".utf8)
+            popSig = NoiseEncryptionService().signData(challenge)
+        }
+        
+        let msg = CampusCredentialMessage(jwt: jwt, devicePubEd25519: devicePub, nonce: requestNonce, popSig: popSig)
+        let packet = BitchatPacket(
+            type: MessageType.campusAttestation.rawValue,
+            senderID: Data(hexString: myPeerID) ?? Data(),
+            recipientID: peerID != nil ? Data(hexString: peerID!) : SpecialRecipients.broadcast,
+            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+            payload: msg.toBinaryData(),
+            signature: nil,
+            ttl: 2
+        )
+        
+        if let specificPeer = peerID {
+            _ = sendDirectToRecipient(packet, recipientPeerID: specificPeer)
+        } else {
+            broadcastPacket(packet)
+        }
+    }
+    private func sendCampusAttestation(to peerID: String? = nil, requestNonce: UInt32? = nil) async {
+        // Use stored ID token as JWT credential
+        let idToken = KeychainManager.shared.retrieve(forKey: "auth_id_token")
+        guard let jwt = idToken else { return }
+        
+        let devicePub = NoiseEncryptionService().getSigningPublicKeyData()
+        let jwtHash = Data(SHA256.hash(data: Data(jwt.utf8)))
+        var popSig: Data? = nil
+        if let nonce = requestNonce {
+            let challenge = Data("ATT_RESP_V1\nnonce:\(nonce)\natt_sha256:".utf8) + jwtHash + Data("\n".utf8)
+            popSig = NoiseEncryptionService().signData(challenge)
+        }
+        
+        let msg = CampusCredentialMessage(jwt: jwt, devicePubEd25519: devicePub, nonce: requestNonce, popSig: popSig)
+        let packet = BitchatPacket(
+            type: MessageType.campusAttestation.rawValue,
+            senderID: Data(hexString: myPeerID) ?? Data(),
+            recipientID: peerID != nil ? Data(hexString: peerID!) : SpecialRecipients.broadcast,
+            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
+            payload: msg.toBinaryData(),
+            signature: nil,
+            ttl: 2
+        )
+        
+        if let specificPeer = peerID {
+            _ = sendDirectToRecipient(packet, recipientPeerID: specificPeer)
+        } else {
+            broadcastPacket(packet)
+        }
+    }
     // MARK: - Connection Pool Management
     
     private func findLeastRecentlyUsedPeripheral() -> String? {

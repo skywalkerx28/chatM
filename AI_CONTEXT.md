@@ -24,8 +24,8 @@ This document briefs contributors and AI agents on what **Mchat** is, why it exi
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                UI Layer                                 │
-│               Home(General (campus-wide chat),
-          Broadcast (Annoucments board), Favorites), 
+│                Home(General (campus-wide chat),
+            Broadcast (Annoucments board), Favorites), 
                    Subchat List, Room / DM Views                          │
 └─────────────────────────────────────────────────────────────────────────┘
                                    │
@@ -113,13 +113,14 @@ This document briefs contributors and AI agents on what **Mchat** is, why it exi
 
 ---
 
-## Presence & Campus Gate
+## Campus Credential & Gating
 
-* **Presence broadcast:** App periodically (10–20s + jitter) broadcasts a compact **presence** frame containing the membership credential.
-* **Receive rules (CampusGate):**
+* **JWT-based credentials:** On-demand exchange of Cognito ID tokens (containing `campus_id`) with optional device Ed25519 proof-of-possession.
+* **CampusGate rules:**
 
-  * Accept room messages only if the sender has **recent valid presence** and **matching `campus_id`**.
-  * Drop room messages otherwise.
+  * Accept room messages only if the sender has **valid cached JWT credential** and **matching `campus_id`** extracted from `conversationId` prefix.
+  * Request/cache credentials on first contact; O(1) lookups thereafter.
+  * Drop room messages from unverified or mismatched campus senders.
 * **DMs:** Bypass CampusGate; remain end-to-end encrypted with Noise.
 
 ---
