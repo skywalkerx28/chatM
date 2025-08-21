@@ -415,14 +415,14 @@
 			path = Utils;
 			sourceTree = "<group>";
 		};
-		36D597D8423726F4E50EBE26 /* ChatM */ = {
+		36D597D8423726F4E50EBE26 /* Mchat */ = {
 			isa = PBXGroup;
 			children = (
 				26D594DC967AB0DF9E864071 /* Auth */,
 				DC118ED7AC0A1B6C867D383C /* Membership */,
 				4B8BCCAF5687FA259CF35DA7 /* Net */,
 			);
-			path = ChatM;
+			path = Mchat;
 			sourceTree = "<group>";
 		};
 		39BAB1901241D525FA46F919 /* Services */ = {

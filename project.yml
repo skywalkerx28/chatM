@@ -1,4 +1,4 @@
-name: chatM
+name: Mchat
 options:
   bundleIdPrefix: chat.chatm
   deploymentTarget:
@@ -22,9 +22,9 @@ targets:
   chatM_iOS:
     type: application
     platform: iOS
-    sources: 
+    sources:
       - bitchat
-      - ChatM
+      - Mchat
     resources:
       - bitchat/Assets.xcassets
       - bitchat/LaunchScreen.storyboard
@@ -82,9 +82,9 @@ targets:
   chatM_macOS:
     type: application
     platform: macOS
-    sources: 
+    sources:
       - bitchat
-      - ChatM
+      - Mchat
     resources:
       - bitchat/Assets.xcassets
     info:

@@ -28,7 +28,7 @@ fi
 echo ""
 echo "Project Structure:"
 echo "- bitchat/           Main source files"
-echo "  - BitchatApp.swift    App entry point (struct ChatMApp)"
+echo "  - BitchatApp.swift    App entry point (struct MchatApp)"
 echo "  - Views/              SwiftUI views"
 echo "  - ViewModels/         View models"
 echo "  - Services/           Bluetooth and encryption"

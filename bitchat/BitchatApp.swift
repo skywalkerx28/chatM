@@ -13,7 +13,7 @@ import Amplify
 import AWSCognitoAuthPlugin
 
 @main
-struct ChatMApp: App {
+struct MchatApp: App {
     @StateObject private var chatViewModel = ChatViewModel()
     @StateObject private var authManager = AuthManager()
     @State private var showingSplash = true
