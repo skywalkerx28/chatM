@@ -81,7 +81,7 @@ import CryptoKit
 import os.log
 #if os(macOS)
 import AppKit
-import IOKit.ps
+import IOKit
 #else
 import UIKit
 #endif
@@ -2552,7 +2552,6 @@ class BluetoothMeshService: NSObject {
                 return .established
             }
             
-            // Default to none
             return .none
         }
     }
@@ -3552,14 +3551,14 @@ class BluetoothMeshService: NSObject {
             
             // Gate by campus attestation - require valid campus credential
             Task {
-                let shouldAcceptMessage = await campusGate.isAllowed(
+                let shouldAcceptMessage = await self.campusGate.isAllowed(
                     conversationId: roomMessage.conversationId,
                     senderPeerID: senderID
                 )
                 
                 guard shouldAcceptMessage else {
                     // Request attestation if needed
-                    if await campusGate.shouldRequestAttestation(for: senderID) {
+                    if await self.campusGate.shouldRequestAttestation(for: senderID) {
                         let request = AttestationRequest(requesterPeerID: self.myPeerID)
                         let packet = BitchatPacket(
                             type: MessageType.attestationRequest.rawValue,
@@ -3580,73 +3579,8 @@ class BluetoothMeshService: NSObject {
                 
                 // Process the room message
                 await self.processValidatedRoomMessage(roomMessage, from: senderID, packet: packet)
-            }
+            } 
             return // Early return since we're processing async
-            
-            // Check if we're joined to this conversation (except for announcements)
-            let conversationStore = ConversationStore.shared
-            let isAnnouncements = roomMessage.conversationId == TopicManager.announcementsId(
-                campusId: MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
-            )
-            
-            if !isAnnouncements && !conversationStore.isJoined(roomMessage.conversationId) {
-                SecureLogger.log("Dropped room message - not joined to conversation", 
-                               category: SecureLogger.session, level: .debug)
-                return
-            }
-            
-            // Store nickname mapping
-            collectionsQueue.sync(flags: .barrier) {
-                if let session = self.peerSessions[senderID] {
-                    session.nickname = roomMessage.sender
-                } else {
-                    let session = PeerSession(peerID: senderID, nickname: roomMessage.sender)
-                    self.peerSessions[senderID] = session
-                }
-            }
-            
-            // Convert RoomMessage to MchatMessage for unified UI handling
-            let mchatMessage = MchatMessage(
-                id: roomMessage.messageId,
-                sender: roomMessage.sender,
-                content: roomMessage.content,
-                timestamp: roomMessage.timestamp,
-                isRelay: false,
-                originalSender: nil,
-                isPrivate: false, // Room messages are not private
-                recipientNickname: nil,
-                senderPeerID: senderID,
-                mentions: roomMessage.mentions,
-                deliveryStatus: nil,
-                conversationId: roomMessage.conversationId  // Include conversation context
-            )
-            
-            // Track last message time from this peer
-            self.lastMessageFromPeer.set(senderID, value: Date())
-            
-            // Update unread count for the conversation
-            Task { @MainActor in
-                conversationStore.incrementUnreadCount(conversationId: roomMessage.conversationId)
-            }
-            
-            // Deliver to UI via delegate
-            DispatchQueue.main.async {
-                // Create a custom delegate method for room messages that includes conversation ID
-                if let chatViewModel = self.delegate as? ChatViewModel {
-                    chatViewModel.didReceiveRoomMessage(mchatMessage, in: roomMessage.conversationId)
-                } else {
-                    // Fallback to regular message handling if delegate doesn't support room messages yet
-                    self.delegate?.didReceiveMessage(mchatMessage)
-                }
-            }
-            
-            // Relay room messages
-            var relayPacket = packet
-            relayPacket.ttl -= 1
-            if relayPacket.ttl > 0 {
-                let delay = self.exponentialRelayDelay()
-                self.scheduleRelay(relayPacket, messageID: messageID, delay: delay)
-            }
             
         case .campusAttestation:
             // Handle campus credential (JWT + optional PoP)
@@ -3655,7 +3589,7 @@ class BluetoothMeshService: NSObject {
             
             if let credMsg = CampusCredentialMessage.fromBinaryData(packet.payload) {
                 Task {
-                    await handleCampusCredentialMessage(credMsg, from: senderID)
+                    await self.handleCampusCredentialMessage(credMsg, from: senderID)
                 }
             }
             
@@ -3666,7 +3600,7 @@ class BluetoothMeshService: NSObject {
             
             if let request = AttestationRequest.fromBinaryData(packet.payload) {
                 Task {
-                    await handleAttestationRequest(request, from: senderID)
+                    await self.handleAttestationRequest(request, from: senderID)
                 }
             }
         // Note: 0x02 was legacy keyExchange - removed
@@ -4613,6 +4547,10 @@ class BluetoothMeshService: NSObject {
                 handleHandshakeRequest(from: senderID, data: packet.payload)
             }
             
+        case .deliveryStatusRequest:
+            // Handle delivery status request
+            break
+            
         case .favorited:
             // Now handled as private messages with "SYSTEM:FAVORITED" content
             // See handleReceivedPacket for MESSAGE type handling
@@ -4623,22 +4561,16 @@ class BluetoothMeshService: NSObject {
             // See handleReceivedPacket for MESSAGE type handling
             break
             
-        case .roomMessage:
-            // Handle room messages (implement or call handler)
-            handleRoomMessage(packet: packet, from: peerID)
+        case .none:
+            // Invalid message type
+            break
             
-        case .campusAttestation:
-            // Handle campus attestation message
-            let senderID = packet.senderID.hexEncodedString()
-            if !isPeerIDOurs(senderID) {
-                if let msg = CampusCredentialMessage.from(packet.payload) {
-                    await handleCampusCredentialMessage(msg, from: senderID)
-                }
-            }
+
             
         default:
             break
         }
+        } 
     }
     
     // MARK: - Room Message Handler (Deprecated - using async JWT-based handler)
@@ -5745,8 +5677,10 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             startAdvertising()
         }
     }
-    
-    // MARK: - Battery Monitoring
+}
+
+// MARK: - Battery Monitoring
+extension BluetoothMeshService {
     
     private func setupBatteryOptimizer() {
         // Subscribe to power mode changes
@@ -5900,8 +5834,10 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         // This method is now handled by BatteryOptimizer through handlePowerModeChange
         // Keeping empty implementation for compatibility
     }
-    
-    // MARK: - Privacy Utilities
+}
+
+// MARK: - Privacy Utilities
+extension BluetoothMeshService {
     
     private func randomDelay() -> TimeInterval {
         // Generate random delay between min and max for timing obfuscation
@@ -5909,7 +5845,6 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
     }
     
     // MARK: - Range Optimization Methods
-    
     
     // Exponential delay distribution to prevent synchronized collision storms
     private func exponentialRelayDelay() -> TimeInterval {
@@ -5934,7 +5869,8 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         case .message, .announce, .leave, .readReceipt, .deliveryStatusRequest,
              .fragmentStart, .fragmentContinue, .fragmentEnd,
              .noiseIdentityAnnounce, .noiseEncrypted, .protocolNack, 
-             .favorited, .unfavorited, .roomMessage, .none:
+             .favorited, .unfavorited, .roomMessage, .campusAttestation, 
+             .attestationRequest, .none:
             return false
         }
     }
@@ -7536,7 +7472,7 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
         let senderNick = nickname?.nickname ?? self.myPeerID
         
         // Create the inner message
-        let message = BitchatMessage(
+        let _ = BitchatMessage(
             id: msgID,
             sender: senderNick,
             content: content,
@@ -7547,11 +7483,28 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             senderPeerID: myPeerID
         )
         
-        // Legacy message creation removed - now using unified room message format
-        
-        // Create DM room message for unified routing
+        // Create DM room message for unified routing using canonical IDs when possible
         let campusId = MembershipCredentialManager.shared.currentProfile()?.campus_id ?? ""
-        let dmConversationId = TopicManager.dmId(peerA: myPeerID, peerB: recipientPeerID, campusId: campusId)
+        
+        // Try to get canonical user IDs for stable DM conversation
+        let myFingerprint = noiseService.getIdentityFingerprint()
+        let myCanonical = SecureIdentityStateManager.shared.getCanonicalIdentity(for: myFingerprint)
+        let recipientFingerprint = getPeerFingerprint(recipientPeerID)
+        let recipientCanonical = recipientFingerprint != nil ? 
+            SecureIdentityStateManager.shared.getCanonicalIdentity(for: recipientFingerprint!) : nil
+        
+        let dmConversationId: Data
+        if let myUserId = myCanonical?.userId, let recipientUserId = recipientCanonical?.userId {
+            // Both have canonical IDs, use stable canonical DM ID
+            dmConversationId = TopicManager.canonicalDmId(userIdA: myUserId, userIdB: recipientUserId, campusId: campusId)
+            SecureLogger.log("Using canonical DM ID for \(myUserId) <-> \(recipientUserId)", 
+                           category: SecureLogger.session, level: .debug)
+        } else {
+            // Fallback to ephemeral peer ID based DM (will be migrated when canonical IDs become available)
+            dmConversationId = TopicManager.dmId(peerA: myPeerID, peerB: recipientPeerID, campusId: campusId)
+            SecureLogger.log("Using ephemeral DM ID for \(myPeerID) <-> \(recipientPeerID) (canonical IDs not available)", 
+                           category: SecureLogger.session, level: .debug)
+        }
         
         let roomMessage = RoomMessage(
             conversationId: dmConversationId,
@@ -7630,12 +7583,25 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
            peripheral.state == .connected {
             
             guard let data = packet.toBinaryData() else { return false }
-            
-            // Send only to the intended recipient
-            writeToPeripheral(data, peripheral: peripheral, characteristic: characteristic, peerID: recipientPeerID)
-            SecureLogger.log("Sent message directly to peripheral \(recipientPeerID)", 
-                           category: SecureLogger.session, level: .debug)
-            return true
+
+            // Respect the current MTU/write limits; choose write type accordingly
+            let noRespLimit = peripheral.maximumWriteValueLength(for: .withoutResponse)
+            let writeType: CBCharacteristicWriteType = data.count > noRespLimit ? .withResponse : .withoutResponse
+
+            if data.count <= noRespLimit {
+                // Safe to write in a single chunk
+                peripheral.writeValue(data, for: characteristic, type: writeType)
+                SecureLogger.log("Sent message directly to peripheral \(recipientPeerID) (\(data.count) bytes)", 
+                               category: SecureLogger.session, level: .debug)
+                return true
+            } else {
+                // Fallback: fragment the packet and send fragments directly to this peer
+                SecureLogger.log("Direct payload (\(data.count) bytes) exceeds write limit (\(noRespLimit)); sending as fragments directly", 
+                               category: SecureLogger.session, level: .info)
+
+                sendFragmentedPacketDirect(packet, to: recipientPeerID)
+                return true
+            }
         }
         
         // Check if recipient is connected as a central (we're peripheral)
@@ -7647,17 +7613,78 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
                    let characteristic = self.characteristic {
                     
                     guard let data = packet.toBinaryData() else { return false }
-                    
-                    // Send to specific central
-                    peripheralManager?.updateValue(data, for: characteristic, onSubscribedCentrals: [central])
-                    SecureLogger.log("Sent message directly to central \(recipientPeerID) (\(centralID.uuidString.prefix(8)))", 
-                                   category: SecureLogger.session, level: .debug)
-                    return true
+
+                    // CoreBluetooth peripheral side has an internal queue; check return and queue if needed
+                    let success = peripheralManager?.updateValue(data, for: characteristic, onSubscribedCentrals: [central]) ?? false
+                    if success {
+                        SecureLogger.log("Sent message directly to central \(recipientPeerID) (\(centralID.uuidString.prefix(8))) (\(data.count) bytes)", 
+                                       category: SecureLogger.session, level: .debug)
+                        return true
+                    } else {
+                        // If too large or buffer full, fragment and send to that central via broadcast path
+                        SecureLogger.log("Peripheral buffer full or payload large for central; sending as fragments to \(recipientPeerID)", 
+                                       category: SecureLogger.session, level: .info)
+                        sendFragmentedPacketDirect(packet, to: recipientPeerID)
+                        return true
+                    }
                 }
             }
         }
         
         return false
+    }
+
+    // Fragment a packet and send fragments targeted to a specific peer when possible
+    private func sendFragmentedPacketDirect(_ packet: BitchatPacket, to recipientPeerID: String) {
+        guard let fullData = packet.toBinaryData() else { return }
+
+        // Generate a fixed 8-byte fragment ID
+        var fragmentID = Data(count: 8)
+        fragmentID.withUnsafeMutableBytes { bytes in
+            arc4random_buf(bytes.baseAddress, 8)
+        }
+
+        let fragments = stride(from: 0, to: fullData.count, by: maxFragmentSize).map { offset in
+            fullData[offset..<min(offset + maxFragmentSize, fullData.count)]
+        }
+
+        let delayBetweenFragments: TimeInterval = 0.02
+        for (index, fragmentData) in fragments.enumerated() {
+            var fragmentPayload = Data()
+            fragmentPayload.append(fragmentID)
+            fragmentPayload.append(UInt8((index >> 8) & 0xFF))
+            fragmentPayload.append(UInt8(index & 0xFF))
+            fragmentPayload.append(UInt8((fragments.count >> 8) & 0xFF))
+            fragmentPayload.append(UInt8(fragments.count & 0xFF))
+            fragmentPayload.append(packet.type)
+            fragmentPayload.append(fragmentData)
+
+            let fragmentType: MessageType
+            if index == 0 {
+                fragmentType = .fragmentStart
+            } else if index == fragments.count - 1 {
+                fragmentType = .fragmentEnd
+            } else {
+                fragmentType = .fragmentContinue
+            }
+
+            var fragmentPacket = BitchatPacket(
+                type: fragmentType.rawValue,
+                senderID: packet.senderID,
+                recipientID: Data(hexString: recipientPeerID),
+                timestamp: packet.timestamp,
+                payload: fragmentPayload,
+                signature: nil,
+                ttl: min(packet.ttl, 2)
+            )
+
+            // Do not broadcast; try direct-to-recipient for each fragment
+            let totalDelay = Double(index) * delayBetweenFragments
+            messageQueue.asyncAfter(deadline: .now() + totalDelay) { [weak self] in
+                guard let self = self else { return }
+                _ = self.sendDirectToRecipient(fragmentPacket, recipientPeerID: recipientPeerID)
+            }
+        }
     }
     
     private func sendHandshakeRequest(to targetPeerID: String, pendingCount: UInt8) {
@@ -7783,7 +7810,8 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             conversationStore.incrementUnreadCount(conversationId: roomMessage.conversationId)
         }
         
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             if let chatViewModel = self.delegate as? ChatViewModel {
                 chatViewModel.didReceiveRoomMessage(mchatMessage, in: roomMessage.conversationId)
             } else {
@@ -7828,41 +7856,41 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
             CampusGate.Metrics.popVerifications += 1
         }
         
+        // Bind canonical identity to cryptographic fingerprint
+        if let fingerprint = getPeerFingerprint(senderID) {
+            SecureIdentityStateManager.shared.setCanonicalIdentity(
+                fingerprint: fingerprint,
+                userId: cred.userId,
+                handle: cred.handle
+            )
+            SecureLogger.log("Bound canonical identity \(cred.handle) (\(cred.userId)) to fingerprint \(fingerprint.prefix(16))...",
+                           category: SecureLogger.security, level: .info)
+        } else {
+            SecureLogger.log("Warning: No fingerprint available for \(senderID) during attestation",
+                           category: SecureLogger.security, level: .warning)
+        }
+        
         let campusPrefix16 = TopicManager.campusPrefix16(campusId: cred.campusId)
         await campusGate.acceptAttestation(peerID: senderID, campusId: cred.campusId, exp: cred.exp, campusPrefix16: campusPrefix16)
         SecureLogger.log("Accepted campus JWT for \(senderID) campus=\(cred.campusId)", category: SecureLogger.security, level: .debug)
     }
     
-    private func sendCampusAttestation(to peerID: String? = nil, requestNonce: UInt32? = nil) async {
-        // Use stored ID token as JWT credential
-        let idToken = KeychainManager.shared.retrieve(forKey: "auth_id_token")
-        guard let jwt = idToken else { return }
-        
-        let devicePub = NoiseEncryptionService().getSigningPublicKeyData()
-        let jwtHash = Data(SHA256.hash(data: Data(jwt.utf8)))
-        var popSig: Data? = nil
-        if let nonce = requestNonce {
-            let challenge = Data("ATT_RESP_V1\nnonce:\(nonce)\natt_sha256:".utf8) + jwtHash + Data("\n".utf8)
-            popSig = NoiseEncryptionService().signData(challenge)
+    private func handleAttestationRequest(_ request: AttestationRequest, from senderID: String) async {
+        // Verify the request is valid and for our campus
+        guard MembershipCredentialManager.shared.currentProfile() != nil else {
+            SecureLogger.log("No current profile for attestation request from \(senderID)", category: SecureLogger.security, level: .warning)
+            return
         }
         
-        let msg = CampusCredentialMessage(jwt: jwt, devicePubEd25519: devicePub, nonce: requestNonce, popSig: popSig)
-        let packet = BitchatPacket(
-            type: MessageType.campusAttestation.rawValue,
-            senderID: Data(hexString: myPeerID) ?? Data(),
-            recipientID: peerID != nil ? Data(hexString: peerID!) : SpecialRecipients.broadcast,
-            timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
-            payload: msg.toBinaryData(),
-            signature: nil,
-            ttl: 2
-        )
+        // Generate a nonce for PoP if requested
+        let nonce = UInt32.random(in: UInt32.min...UInt32.max)
         
-        if let specificPeer = peerID {
-            _ = sendDirectToRecipient(packet, recipientPeerID: specificPeer)
-        } else {
-            broadcastPacket(packet)
-        }
+        // Send our campus credential with PoP
+        await sendCampusAttestation(to: senderID, requestNonce: nonce)
+        
+        SecureLogger.log("Sent campus attestation response to \(senderID) with nonce", category: SecureLogger.security, level: .debug)
     }
+    
     private func sendCampusAttestation(to peerID: String? = nil, requestNonce: UInt32? = nil) async {
         // Use stored ID token as JWT credential
         let idToken = KeychainManager.shared.retrieve(forKey: "auth_id_token")
@@ -7928,4 +7956,5 @@ extension BluetoothMeshService: CBPeripheralManagerDelegate {
     private func updatePeripheralActivity(_ peripheralID: String) {
         lastActivityByPeripheralID[peripheralID] = Date()
     }
-}
+  }
+
