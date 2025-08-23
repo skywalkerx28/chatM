@@ -204,9 +204,13 @@ struct BinaryProtocol {
         }
         
         
-        // Apply transport padding except for Noise-encrypted (DM) packets where
-        // length-hiding is handled inside the AEAD layer (bin padding)
-        if packet.type == MessageType.noiseEncrypted.rawValue {
+        // Apply transport padding except for Noise-encrypted (DM) packets and
+        // protocol fragments. DM length-hiding is handled inside AEAD. Fragment
+        // packets must remain small to respect BLE write/notify MTU limits.
+        if packet.type == MessageType.noiseEncrypted.rawValue ||
+           packet.type == MessageType.fragmentStart.rawValue ||
+           packet.type == MessageType.fragmentContinue.rawValue ||
+           packet.type == MessageType.fragmentEnd.rawValue {
             return data
         } else {
             let optimalSize = MessagePadding.optimalBlockSize(for: data.count)
