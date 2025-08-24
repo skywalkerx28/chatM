@@ -79,11 +79,6 @@ final class ConversationStore: ObservableObject {
         let joinedConversation = JoinedConversation(conversation: conversation)
         joinedConversations[conversation.id] = joinedConversation
         saveJoinedConversations()
-        
-        // Automatically favorite system conversations (Announcements, General)
-        if conversation.isSystemConversation {
-            toggleFavorite(conversationId: conversation.id, isFavorite: true)
-        }
     }
     
     /// Leave a conversation
@@ -159,12 +154,6 @@ final class ConversationStore: ObservableObject {
         let announcements = Conversation.announcements(campusId: campusId)
         if !isJoined(announcements.id) {
             joinConversation(announcements)
-        }
-        
-        // Auto-join General
-        let general = Conversation.general(campusId: campusId)
-        if !isJoined(general.id) {
-            joinConversation(general)
         }
     }
     

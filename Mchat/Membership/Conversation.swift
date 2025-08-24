@@ -59,6 +59,16 @@ struct Conversation: Codable, Identifiable, Equatable {
         )
     }
     
+    /// Create Schulich School conversation for campus
+    static func schulich(campusId: String) -> Conversation {
+        let id = TopicManager.schulichId(campusId: campusId)
+        return Conversation(
+            id: id,
+            displayName: "Schulich",
+            campusId: campusId
+        )
+    }
+    
     /// Create course conversation
     static func course(department: String, number: String, term: String, campusId: String, sessionInfo: CourseInfo.SessionInfo? = nil) -> Conversation {
         let courseData = TopicManager.courseId(dept: department, num: number, term: term)

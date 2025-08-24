@@ -39,8 +39,29 @@ enum TopicManager {
         return camp + broadcast
     }
 
-    /// Generate deterministic conversation ID for 1:1 DM conversations
+    /// Generate deterministic conversation ID for Schulich 
+    static func schulichId(campusId: String) -> Data {
+        let camp = sha256_8("campus|\(campusId)") + sha256_8("campus2|\(campusId)")
+        let schulich = sha256_8("SCHULICH") + sha256_8("BUSINESS")
+        return camp + schulich
+    }
+
+    /// Generate deterministic conversation ID for 1:1 DM conversations using canonical user IDs
+    /// Uses sorted user IDs to ensure same ID regardless of who initiates
+    static func canonicalDmId(userIdA: String, userIdB: String, campusId: String) -> Data {
+        let camp = sha256_8("campus|\(campusId)") + sha256_8("campus2|\(campusId)")
+        
+        // Sort user IDs to ensure deterministic ordering
+        let sortedUsers = [userIdA, userIdB].sorted()
+        let dm1 = sha256_8("CDM|\(sortedUsers[0])") // CDM = Canonical DM
+        let dm2 = sha256_8("CDM|\(sortedUsers[1])")
+        
+        return camp + dm1 + dm2
+    }
+    
+    /// Generate deterministic conversation ID for 1:1 DM conversations (legacy using peer IDs)
     /// Uses sorted peer IDs to ensure same ID regardless of who initiates
+    /// @deprecated Use canonicalDmId instead for stable user identity
     static func dmId(peerA: String, peerB: String, campusId: String) -> Data {
         let camp = sha256_8("campus|\(campusId)") + sha256_8("campus2|\(campusId)")
         
